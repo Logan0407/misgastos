@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0a14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Registra tus gastos personales de forma rápida y sencilla desde tu celular.">
+  <title>MisGastos</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ===== Header ===== -->
+  <header id="app-header">
+    <h1>💰 MisGastos</h1>
+    <span id="current-month"></span>
+  </header>
+
+  <!-- ===== Views Container ===== -->
+  <main id="views-container">
+
+    <!-- ── Dashboard ── -->
+    <section id="view-dashboard" class="view active">
+      <div class="summary-cards">
+        <div class="card total-card animate-in">
+          <span class="card-label">Gasto del mes</span>
+          <span class="card-amount" id="month-total">$0</span>
+          <div class="budget-bar" id="budget-bar">
+            <div class="budget-fill" id="budget-fill"></div>
+          </div>
+          <span class="budget-label" id="budget-label"></span>
+        </div>
+        <div class="cards-row">
+          <div class="card animate-in">
+            <span class="card-label">Hoy</span>
+            <span class="card-amount small" id="today-total">$0</span>
+          </div>
+          <div class="card animate-in">
+            <span class="card-label">Esta semana</span>
+            <span class="card-amount small" id="week-total">$0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card chart-card animate-in">
+        <h3>Por categoría</h3>
+        <canvas id="category-chart"></canvas>
+      </div>
+
+      <div class="card chart-card animate-in">
+        <h3>Últimos 7 días</h3>
+        <canvas id="daily-chart"></canvas>
+      </div>
+
+      <div class="card animate-in">
+        <h3>Últimos gastos</h3>
+        <div id="recent-expenses"></div>
+      </div>
+    </section>
+
+    <!-- ── Agregar Gasto ── -->
+    <section id="view-add" class="view">
+      <div class="add-form">
+        <div class="amount-input-container">
+          <span class="currency-symbol">$</span>
+          <input type="text" id="expense-amount" inputmode="numeric" placeholder="0" autocomplete="off">
+        </div>
+
+        <input type="text" id="expense-description" placeholder="¿En qué gastaste?" autocomplete="off">
+
+        <div class="category-grid" id="category-grid"></div>
+
+        <input type="date" id="expense-date">
+
+        <button id="save-expense" class="btn-primary">
+          Guardar Gasto
+          <span class="btn-check">✓</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ── Historial ── -->
+    <section id="view-history" class="view">
+      <div class="history-filters">
+        <select id="filter-period">
+          <option value="month">Este mes</option>
+          <option value="week">Esta semana</option>
+          <option value="today">Hoy</option>
+          <option value="all">Todo</option>
+        </select>
+        <select id="filter-category">
+          <option value="all">Todas</option>
+        </select>
+      </div>
+      <div id="history-list"></div>
+    </section>
+
+    <!-- ── Ajustes ── -->
+    <section id="view-settings" class="view">
+      <div class="settings-group">
+        <h3>💰 Presupuesto Mensual</h3>
+        <div class="setting-item">
+          <input type="text" id="budget-amount" inputmode="numeric" placeholder="Ej: 500.000">
+          <button id="save-budget" class="btn-secondary">Guardar</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>📤 Exportar Datos</h3>
+        <button id="export-csv" class="btn-secondary">Exportar a CSV</button>
+      </div>
+
+      <div class="settings-group">
+        <h3>⚠️ Zona de Peligro</h3>
+        <button id="clear-data" class="btn-danger">🗑️ Borrar todos los gastos</button>
+      </div>
+
+      <div class="settings-version">
+        MisGastos v1.0 — Hecho con 💚
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ===== Bottom Navigation ===== -->
+  <nav id="bottom-nav">
+    <button class="nav-btn active" data-view="dashboard" id="nav-dashboard">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+        <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+        <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+      </svg>
+      <span>Inicio</span>
+    </button>
+    <button class="nav-btn" data-view="add" id="nav-add">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <line x1="12" y1="8" x2="12" y2="16"></line>
+        <line x1="8" y1="12" x2="16" y2="12"></line>
+      </svg>
+      <span>Agregar</span>
+    </button>
+    <button class="nav-btn" data-view="history" id="nav-history">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <polyline points="12 7 12 12 15.5 14"></polyline>
+      </svg>
+      <span>Historial</span>
+    </button>
+    <button class="nav-btn" data-view="settings" id="nav-settings">
+      <svg viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+      </svg>
+      <span>Ajustes</span>
+    </button>
+  </nav>
+
+  <!-- ===== Edit Modal ===== -->
+  <div class="modal-overlay" id="edit-modal">
+    <div class="modal-content">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Editar Gasto</div>
+      <div class="modal-form">
+        <input type="text" id="edit-amount" inputmode="numeric" placeholder="Monto" autocomplete="off">
+        <input type="text" id="edit-description" placeholder="Descripción" autocomplete="off">
+        <select id="edit-category"></select>
+        <input type="date" id="edit-date">
+        <div class="modal-actions">
+          <button id="edit-cancel" class="btn-secondary">Cancelar</button>
+          <button id="edit-save" class="btn-primary">Guardar</button>
+        </div>
+        <button id="edit-delete" class="btn-danger" style="margin-top: 4px;">🗑️ Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Confirm Dialog ===== -->
+  <div class="confirm-overlay" id="confirm-dialog">
+    <div class="confirm-box">
+      <div class="confirm-title" id="confirm-title"></div>
+      <div class="confirm-message" id="confirm-message"></div>
+      <div class="confirm-actions">
+        <button class="confirm-cancel" id="confirm-cancel">Cancelar</button>
+        <button class="confirm-ok" id="confirm-ok">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/db.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
