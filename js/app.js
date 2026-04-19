@@ -8,6 +8,7 @@ class MisGastosApp {
     this.charts = new GastosCharts();
     this.currentView = 'dashboard';
     this.selectedCategory = null;
+    this.selectedPaymentSource = 'debito';
     this.editingExpense = null;
     this.swipedItem = null;
   }
@@ -192,6 +193,9 @@ class MisGastosApp {
     // Renderizar categorías
     this.renderCategories();
 
+    // Renderizar fuentes de pago
+    this.renderPaymentSources();
+
     // Guardar
     saveBtn.addEventListener('click', () => this.saveExpense());
   }
@@ -217,11 +221,37 @@ class MisGastosApp {
     });
   }
 
+  renderPaymentSources() {
+    const grid = document.getElementById('payment-source-grid');
+    if (!grid) return;
+
+    grid.innerHTML = DEFAULT_PAYMENT_SOURCES.map(source => `
+      <button class="payment-source-btn" data-id="${source.id}" type="button">
+        <span class="payment-source-btn-icon">${source.icon}</span>
+        <span class="payment-source-btn-label">${source.name}</span>
+      </button>
+    `).join('');
+
+    // Seleccionar débito por defecto
+    const defaultBtn = grid.querySelector(`[data-id="${this.selectedPaymentSource}"]`);
+    if (defaultBtn) defaultBtn.classList.add('selected');
+
+    // Click handler
+    grid.querySelectorAll('.payment-source-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.payment-source-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this.selectedPaymentSource = btn.dataset.id;
+      });
+    });
+  }
+
   async saveExpense() {
     const amount = Utils.parseCurrency(document.getElementById('expense-amount').value);
     const description = document.getElementById('expense-description').value.trim();
     const date = document.getElementById('expense-date').value;
     const category = this.selectedCategory;
+    const paymentSource = this.selectedPaymentSource;
 
     // Validaciones
     if (!amount || amount <= 0) {
@@ -238,7 +268,7 @@ class MisGastosApp {
     }
 
     try {
-      await this.db.addExpense({ amount, description, date, category });
+      await this.db.addExpense({ amount, description, date, category, paymentSource });
 
       // Feedback visual
       const btn = document.getElementById('save-expense');
@@ -263,7 +293,13 @@ class MisGastosApp {
     document.getElementById('expense-description').value = '';
     document.getElementById('expense-date').value = Utils.today();
     document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('.payment-source-btn').forEach(b => b.classList.remove('selected'));
     this.selectedCategory = null;
+    this.selectedPaymentSource = 'debito';
+
+    // Seleccionar débito por defecto
+    const defaultBtn = document.querySelector(`#payment-source-grid [data-id="debito"]`);
+    if (defaultBtn) defaultBtn.classList.add('selected');
 
     // Focus on amount for quick entry
     setTimeout(() => {
@@ -283,6 +319,16 @@ class MisGastosApp {
     categoryFilter.innerHTML = '<option value="all">Todas</option>' +
       DEFAULT_CATEGORIES.map(c => `<option value="${c.id}">${c.icon} ${c.name}</option>`).join('');
 
+    // Payment source filter buttons
+    const paymentButtons = document.querySelectorAll('.payment-filter-btn');
+    paymentButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        paymentButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.refreshHistory();
+      });
+    });
+
     periodFilter.addEventListener('change', () => this.refreshHistory());
     categoryFilter.addEventListener('change', () => this.refreshHistory());
   }
@@ -290,6 +336,8 @@ class MisGastosApp {
   async refreshHistory() {
     const period = document.getElementById('filter-period').value;
     const category = document.getElementById('filter-category').value;
+    const activePaymentBtn = document.querySelector('.payment-filter-btn.active');
+    const paymentSource = activePaymentBtn ? activePaymentBtn.dataset.source : 'all';
 
     let expenses;
     const today = Utils.today();
@@ -314,24 +362,34 @@ class MisGastosApp {
       expenses = expenses.filter(e => e.category === category);
     }
 
+    // Filter by payment source
+    if (paymentSource !== 'all') {
+      expenses = expenses.filter(e => (e.paymentSource || 'debito') === paymentSource);
+    }
+
     // Sort by date desc, then by id desc
     expenses.sort((a, b) => {
       if (a.date !== b.date) return b.date.localeCompare(a.date);
       return b.id - a.id;
     });
 
-    this.renderHistory(expenses);
+    this.renderHistory(expenses, paymentSource);
   }
 
-  renderHistory(expenses) {
+  renderHistory(expenses, paymentFilter = 'all') {
     const container = document.getElementById('history-list');
     if (!container) return;
 
     if (expenses.length === 0) {
+      let emptyMessage = 'No hay gastos en este período';
+      if (paymentFilter !== 'all') {
+        const sourceName = DEFAULT_PAYMENT_SOURCES.find(s => s.id === paymentFilter)?.name || paymentFilter;
+        emptyMessage = `No hay gastos con ${sourceName}`;
+      }
       container.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">📭</div>
-          <div class="empty-state-text">No hay gastos en este período</div>
+          <div class="empty-state-text">${emptyMessage}</div>
         </div>
       `;
       return;
@@ -373,6 +431,7 @@ class MisGastosApp {
 
   _expenseItemHTML(exp) {
     const cat = DEFAULT_CATEGORIES.find(c => c.id === exp.category) || DEFAULT_CATEGORIES[7];
+    const source = DEFAULT_PAYMENT_SOURCES.find(s => s.id === (exp.paymentSource || 'debito')) || DEFAULT_PAYMENT_SOURCES[0];
     return `
       <div class="expense-item" data-id="${exp.id}">
         <div class="expense-icon" style="background: ${cat.color}20; color: ${cat.color}">
@@ -383,7 +442,7 @@ class MisGastosApp {
           <div class="expense-meta">
             <span>${cat.name}</span>
             <span>•</span>
-            <span>${Utils.relativeDate(exp.date)}</span>
+            <span>${source.icon} ${source.name}</span>
           </div>
         </div>
         <div class="expense-amount">${Utils.formatCurrency(exp.amount)}</div>
@@ -533,6 +592,12 @@ class MisGastosApp {
       `<option value="${c.id}" ${c.id === expense.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
     ).join('');
 
+    // Payment source select
+    const sourceSelect = document.getElementById('edit-payment-source');
+    sourceSelect.innerHTML = DEFAULT_PAYMENT_SOURCES.map(s =>
+      `<option value="${s.id}" ${s.id === (expense.paymentSource || 'debito') ? 'selected' : ''}>${s.icon} ${s.name}</option>`
+    ).join('');
+
     const overlay = document.getElementById('edit-modal');
     overlay.classList.add('active');
   }
@@ -550,6 +615,7 @@ class MisGastosApp {
     const description = document.getElementById('edit-description').value.trim();
     const date = document.getElementById('edit-date').value;
     const category = document.getElementById('edit-category').value;
+    const paymentSource = document.getElementById('edit-payment-source').value;
 
     if (!amount || !description) {
       Utils.showToast('Completa todos los campos', 'error');
@@ -563,6 +629,7 @@ class MisGastosApp {
         description,
         date,
         category,
+        paymentSource,
         month: Utils.monthKeyFromDate(date)
       };
 

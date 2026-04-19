@@ -188,6 +188,14 @@ const Utils = {
   }
 };
 
+// Fuentes de pago
+const DEFAULT_PAYMENT_SOURCES = [
+  { id: 'debito', name: 'Débito', icon: '💳' },
+  { id: 'credito', name: 'Crédito', icon: '💳' },
+  { id: 'efectivo', name: 'Efectivo', icon: '💵' },
+  { id: 'transferencia', name: 'Transferencia', icon: '↔️' }
+];
+
 // Categorías por defecto
 const DEFAULT_CATEGORIES = [
   { id: 'alimentacion', name: 'Alimentación', icon: '🍔', color: '#ff6b6b' },

@@ -79,6 +79,9 @@
 
         <div class="category-grid" id="category-grid"></div>
 
+        <label class="form-label">Fuente de pago</label>
+        <div class="payment-source-grid" id="payment-source-grid"></div>
+
         <input type="date" id="expense-date">
 
         <button id="save-expense" class="btn-primary">
@@ -100,6 +103,13 @@
         <select id="filter-category">
           <option value="all">Todas</option>
         </select>
+      </div>
+      <div class="payment-source-filter">
+        <button class="payment-filter-btn active" data-source="all">Todo</button>
+        <button class="payment-filter-btn" data-source="debito">💳 Débito</button>
+        <button class="payment-filter-btn" data-source="credito">💳 Crédito</button>
+        <button class="payment-filter-btn" data-source="efectivo">💵 Efectivo</button>
+        <button class="payment-filter-btn" data-source="transferencia">↔️ Transferencia</button>
       </div>
       <div id="history-list"></div>
     </section>
@@ -175,6 +185,7 @@
         <input type="text" id="edit-amount" inputmode="numeric" placeholder="Monto" autocomplete="off">
         <input type="text" id="edit-description" placeholder="Descripción" autocomplete="off">
         <select id="edit-category"></select>
+        <select id="edit-payment-source"></select>
         <input type="date" id="edit-date">
         <div class="modal-actions">
           <button id="edit-cancel" class="btn-secondary">Cancelar</button>

@@ -471,6 +471,15 @@ button {
   color: var(--text-muted);
 }
 
+.form-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: -8px;
+}
+
 /* ---- Category Grid ---- */
 
 .category-grid {
@@ -514,6 +523,52 @@ button {
 }
 
 .category-btn.selected .category-btn-label {
+  color: var(--accent);
+}
+
+/* ---- Payment Source Grid ---- */
+
+.payment-source-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.payment-source-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  transition: all 0.2s var(--ease-out);
+  cursor: pointer;
+}
+
+.payment-source-btn:active {
+  transform: scale(0.95);
+}
+
+.payment-source-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.payment-source-btn-icon {
+  font-size: 1.5rem;
+}
+
+.payment-source-btn-label {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.payment-source-btn.selected .payment-source-btn-label {
   color: var(--accent);
 }
 
@@ -637,6 +692,46 @@ button {
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 34px;
+}
+
+/* ---- Payment Source Filter ---- */
+
+.payment-source-filter {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  margin-bottom: 8px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.payment-source-filter::-webkit-scrollbar {
+  display: none;
+}
+
+.payment-filter-btn {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all 0.2s var(--ease-out);
+  cursor: pointer;
+}
+
+.payment-filter-btn:active {
+  transform: scale(0.95);
+}
+
+.payment-filter-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 /* ---- Settings ---- */
@@ -857,6 +952,25 @@ button {
 }
 
 .modal-form input:focus {
+  border-color: var(--accent);
+}
+
+.modal-form select {
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238888aa' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.modal-form select:focus {
   border-color: var(--accent);
 }
 

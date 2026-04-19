@@ -3,7 +3,7 @@
 // ============================================
 
 const DB_NAME = 'MisGastosDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class GastosDB {
   constructor() {
@@ -18,6 +18,7 @@ class GastosDB {
 
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
+        const oldVersion = event.oldVersion;
 
         // Store de gastos
         if (!db.objectStoreNames.contains('expenses')) {
@@ -25,6 +26,13 @@ class GastosDB {
           store.createIndex('date', 'date', { unique: false });
           store.createIndex('category', 'category', { unique: false });
           store.createIndex('month', 'month', { unique: false });
+          store.createIndex('paymentSource', 'paymentSource', { unique: false });
+        } else if (oldVersion < 2) {
+          // Migración: agregar índice de fuente de pago
+          const store = request.transaction.objectStore('expenses');
+          if (!store.indexNames.contains('paymentSource')) {
+            store.createIndex('paymentSource', 'paymentSource', { unique: false });
+          }
         }
 
         // Store de presupuestos
@@ -70,6 +78,7 @@ class GastosDB {
     const store = this._transaction('expenses', 'readwrite');
     const data = {
       ...expense,
+      paymentSource: expense.paymentSource || 'debito',
       month: Utils.monthKeyFromDate(expense.date),
       createdAt: new Date().toISOString()
     };
@@ -112,6 +121,12 @@ class GastosDB {
     const store = this._transaction('expenses');
     const index = store.index('category');
     return this._promisify(index.getAll(categoryId));
+  }
+
+  async getExpensesByPaymentSource(sourceId) {
+    const store = this._transaction('expenses');
+    const index = store.index('paymentSource');
+    return this._promisify(index.getAll(sourceId));
   }
 
   async getExpensesByDateRange(startDate, endDate) {
@@ -161,6 +176,16 @@ class GastosDB {
       byCategory[e.category] += e.amount;
     });
 
+    // Por fuente de pago
+    const byPaymentSource = {};
+    expenses.forEach(e => {
+      const source = e.paymentSource || 'debito';
+      if (!byPaymentSource[source]) {
+        byPaymentSource[source] = 0;
+      }
+      byPaymentSource[source] += e.amount;
+    });
+
     // Por día
     const byDay = {};
     expenses.forEach(e => {
@@ -174,6 +199,7 @@ class GastosDB {
       total,
       budget: budget ? budget.amount : null,
       byCategory,
+      byPaymentSource,
       byDay,
       count: expenses.length,
       expenses
@@ -230,9 +256,15 @@ class GastosDB {
       return cat ? cat.name : catId;
     };
 
-    const header = 'Fecha,Descripción,Categoría,Monto\n';
+    // Encontrar el nombre de la fuente de pago
+    const getPaymentSourceName = (sourceId) => {
+      const source = DEFAULT_PAYMENT_SOURCES.find(s => s.id === (sourceId || 'debito'));
+      return source ? source.name : (sourceId || 'Débito');
+    };
+
+    const header = 'Fecha,Descripción,Categoría,Fuente de Pago,Monto\n';
     const rows = expenses.map(e =>
-      `${e.date},"${e.description}",${getCategoryName(e.category)},${e.amount}`
+      `${e.date},"${e.description}",${getCategoryName(e.category)},${getPaymentSourceName(e.paymentSource)},${e.amount}`
     ).join('\n');
 
     const csv = header + rows;
