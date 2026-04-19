@@ -2,7 +2,7 @@
 // MisGastos — Service Worker (Offline Support)
 // ============================================
 
-const CACHE_NAME = 'misgastos-v1';
+const CACHE_NAME = 'misgastos-v2';
 const ASSETS = [
   './',
   './index.html',
