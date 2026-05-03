@@ -6,11 +6,22 @@ class GastosCharts {
   constructor() {
     this.categoryChart = null;
     this.dailyChart = null;
+    this.theme = 'dark';
     this.colors = {
       grid: 'rgba(255, 255, 255, 0.06)',
       text: '#8888aa',
       tooltip: '#1a1a2e'
     };
+  }
+
+  updateTheme(theme) {
+    this.theme = theme;
+    if (theme === 'light') {
+      this.colors = { grid: 'rgba(0, 0, 0, 0.06)', text: '#6b6b80', tooltip: '#ffffff' };
+    } else {
+      this.colors = { grid: 'rgba(255, 255, 255, 0.06)', text: '#8888aa', tooltip: '#1a1a2e' };
+    }
+    Chart.defaults.color = this.colors.text;
   }
 
   // ---- Defaults de Chart.js ----
@@ -63,7 +74,7 @@ class GastosCharts {
         datasets: [{
           data,
           backgroundColor: colors,
-          borderColor: 'rgba(13, 13, 26, 0.8)',
+          borderColor: this.theme === 'light' ? 'rgba(245, 245, 247, 0.9)' : 'rgba(13, 13, 26, 0.8)',
           borderWidth: 3,
           hoverBorderWidth: 0,
           hoverOffset: 8

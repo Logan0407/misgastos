@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0a14">
+  <meta name="theme-color" content="#131320" id="meta-theme-color">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Registra tus gastos personales de forma rápida y sencilla desde tu celular.">
+  <meta name="description" content="Registra tus gastos e ingresos personales de forma rápida y sencilla desde tu celular.">
   <title>MisGastos</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -30,10 +30,28 @@
 
     <!-- ── Dashboard ── -->
     <section id="view-dashboard" class="view active">
+      <!-- Balance Card -->
       <div class="summary-cards">
-        <div class="card total-card animate-in">
-          <span class="card-label">Gasto del mes</span>
-          <span class="card-amount" id="month-total">$0</span>
+        <div class="card balance-card animate-in">
+          <span class="card-label">Balance del mes</span>
+          <span class="card-amount" id="month-balance">$0</span>
+          <div class="balance-details">
+            <div class="balance-detail income-detail">
+              <span class="balance-detail-icon">↑</span>
+              <div>
+                <span class="balance-detail-label">Ingresos</span>
+                <span class="balance-detail-amount" id="month-income-total">$0</span>
+              </div>
+            </div>
+            <div class="balance-divider"></div>
+            <div class="balance-detail expense-detail">
+              <span class="balance-detail-icon">↓</span>
+              <div>
+                <span class="balance-detail-label">Gastos</span>
+                <span class="balance-detail-amount" id="month-total">$0</span>
+              </div>
+            </div>
+          </div>
           <div class="budget-bar" id="budget-bar">
             <div class="budget-fill" id="budget-fill"></div>
           </div>
@@ -49,6 +67,12 @@
             <span class="card-amount small" id="week-total">$0</span>
           </div>
         </div>
+      </div>
+
+      <!-- Pagos pendientes resumen -->
+      <div class="card payments-summary-card animate-in" id="payments-summary-card" style="display:none;">
+        <h3>📋 Pagos del mes</h3>
+        <div id="payments-summary-content"></div>
       </div>
 
       <div class="card chart-card animate-in">
@@ -70,7 +94,7 @@
     <!-- ── Agregar Gasto ── -->
     <section id="view-add" class="view">
       <div class="add-form">
-        <div class="amount-input-container">
+        <div class="amount-input-container expense-amount-container">
           <span class="currency-symbol">$</span>
           <input type="text" id="expense-amount" inputmode="numeric" placeholder="0" autocomplete="off">
         </div>
@@ -91,8 +115,53 @@
       </div>
     </section>
 
+    <!-- ── Agregar Ingreso ── -->
+    <section id="view-income" class="view">
+      <div class="add-form">
+        <div class="amount-input-container income-amount-container">
+          <span class="currency-symbol income-symbol">$</span>
+          <input type="text" id="income-amount" inputmode="numeric" placeholder="0" autocomplete="off">
+        </div>
+
+        <input type="text" id="income-description" placeholder="¿De dónde viene el ingreso?" autocomplete="off">
+
+        <div class="category-grid" id="income-category-grid"></div>
+
+        <input type="date" id="income-date">
+
+        <button id="save-income" class="btn-primary btn-income">
+          Guardar Ingreso
+          <span class="btn-check">✓</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ── Pagos Recurrentes ── -->
+    <section id="view-payments" class="view">
+      <div class="payments-header">
+        <h2>Pagos del Mes</h2>
+        <div class="payments-progress" id="payments-progress">
+          <span id="payments-progress-text">0 de 0 pagados</span>
+          <div class="payments-progress-bar">
+            <div class="payments-progress-fill" id="payments-progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="recurring-payments-list"></div>
+
+      <button class="btn-add-payment" id="btn-add-payment">
+        <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        Agregar pago recurrente
+      </button>
+    </section>
+
     <!-- ── Historial ── -->
     <section id="view-history" class="view">
+      <div class="history-tabs">
+        <button class="history-tab active" data-tab="expenses" id="tab-expenses">Gastos</button>
+        <button class="history-tab" data-tab="income" id="tab-income">Ingresos</button>
+      </div>
       <div class="history-filters">
         <select id="filter-period">
           <option value="month">Este mes</option>
@@ -104,7 +173,7 @@
           <option value="all">Todas</option>
         </select>
       </div>
-      <div class="payment-source-filter">
+      <div class="payment-source-filter" id="payment-source-filter-container">
         <button class="payment-filter-btn active" data-source="all">Todo</button>
         <button class="payment-filter-btn" data-source="debito">💳 Débito</button>
         <button class="payment-filter-btn" data-source="credito">💳 Crédito</button>
@@ -116,6 +185,20 @@
 
     <!-- ── Ajustes ── -->
     <section id="view-settings" class="view">
+      <div class="settings-group">
+        <h3>🎨 Apariencia</h3>
+        <div class="theme-toggle-container">
+          <button class="theme-option active" data-theme="dark" id="theme-dark">
+            <span class="theme-option-icon">🌙</span>
+            <span>Oscuro</span>
+          </button>
+          <button class="theme-option" data-theme="light" id="theme-light">
+            <span class="theme-option-icon">☀️</span>
+            <span>Claro</span>
+          </button>
+        </div>
+      </div>
+
       <div class="settings-group">
         <h3>💰 Presupuesto Mensual</h3>
         <div class="setting-item">
@@ -131,11 +214,11 @@
 
       <div class="settings-group">
         <h3>⚠️ Zona de Peligro</h3>
-        <button id="clear-data" class="btn-danger">🗑️ Borrar todos los gastos</button>
+        <button id="clear-data" class="btn-danger">🗑️ Borrar todos los datos</button>
       </div>
 
       <div class="settings-version">
-        MisGastos v1.0 — Hecho con 💚
+        MisGastos v2.0 — Hecho con 💚
       </div>
     </section>
 
@@ -154,11 +237,24 @@
     </button>
     <button class="nav-btn" data-view="add" id="nav-add">
       <svg viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="9"></circle>
-        <line x1="12" y1="8" x2="12" y2="16"></line>
-        <line x1="8" y1="12" x2="16" y2="12"></line>
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
       </svg>
-      <span>Agregar</span>
+      <span>Gasto</span>
+    </button>
+    <button class="nav-btn" data-view="income" id="nav-income">
+      <svg viewBox="0 0 24 24">
+        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+        <polyline points="17 6 23 6 23 12"></polyline>
+      </svg>
+      <span>Ingreso</span>
+    </button>
+    <button class="nav-btn" data-view="payments" id="nav-payments">
+      <svg viewBox="0 0 24 24">
+        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+        <line x1="2" y1="10" x2="22" y2="10"></line>
+      </svg>
+      <span>Pagos</span>
     </button>
     <button class="nav-btn" data-view="history" id="nav-history">
       <svg viewBox="0 0 24 24">
@@ -192,6 +288,45 @@
           <button id="edit-save" class="btn-primary">Guardar</button>
         </div>
         <button id="edit-delete" class="btn-danger" style="margin-top: 4px;">🗑️ Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Edit Income Modal ===== -->
+  <div class="modal-overlay" id="edit-income-modal">
+    <div class="modal-content">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Editar Ingreso</div>
+      <div class="modal-form">
+        <input type="text" id="edit-income-amount" inputmode="numeric" placeholder="Monto" autocomplete="off">
+        <input type="text" id="edit-income-description" placeholder="Descripción" autocomplete="off">
+        <select id="edit-income-category"></select>
+        <input type="date" id="edit-income-date">
+        <div class="modal-actions">
+          <button id="edit-income-cancel" class="btn-secondary">Cancelar</button>
+          <button id="edit-income-save" class="btn-primary btn-income">Guardar</button>
+        </div>
+        <button id="edit-income-delete" class="btn-danger" style="margin-top: 4px;">🗑️ Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Add Recurring Payment Modal ===== -->
+  <div class="modal-overlay" id="add-payment-modal">
+    <div class="modal-content">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="payment-modal-title">Agregar Pago Recurrente</div>
+      <div class="modal-form">
+        <input type="text" id="payment-name" placeholder="Nombre (ej: Netflix, Arriendo)" autocomplete="off">
+        <input type="text" id="payment-amount" inputmode="numeric" placeholder="Monto mensual" autocomplete="off">
+        <div class="form-label" style="margin-bottom: -4px;">Día de vencimiento</div>
+        <input type="number" id="payment-due-day" min="1" max="31" placeholder="Día (1-31)" style="padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-card); border: 1px solid var(--border);">
+        <div class="form-label" style="margin-bottom: -4px;">Tipo</div>
+        <div class="category-grid payment-type-grid" id="payment-type-grid"></div>
+        <div class="modal-actions">
+          <button id="payment-cancel" class="btn-secondary">Cancelar</button>
+          <button id="payment-save" class="btn-primary">Guardar</button>
+        </div>
       </div>
     </div>
   </div>

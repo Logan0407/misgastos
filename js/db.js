@@ -3,7 +3,7 @@
 // ============================================
 
 const DB_NAME = 'MisGastosDB';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 class GastosDB {
   constructor() {
@@ -43,6 +43,27 @@ class GastosDB {
         // Store de configuración
         if (!db.objectStoreNames.contains('settings')) {
           db.createObjectStore('settings', { keyPath: 'key' });
+        }
+
+        // v3: Store de ingresos
+        if (!db.objectStoreNames.contains('income')) {
+          const incomeStore = db.createObjectStore('income', { keyPath: 'id', autoIncrement: true });
+          incomeStore.createIndex('date', 'date', { unique: false });
+          incomeStore.createIndex('month', 'month', { unique: false });
+          incomeStore.createIndex('category', 'category', { unique: false });
+        }
+
+        // v3: Store de pagos recurrentes
+        if (!db.objectStoreNames.contains('recurring_payments')) {
+          const recurringStore = db.createObjectStore('recurring_payments', { keyPath: 'id', autoIncrement: true });
+          recurringStore.createIndex('type', 'type', { unique: false });
+        }
+
+        // v3: Store de estado de pagos (por mes)
+        if (!db.objectStoreNames.contains('payment_status')) {
+          const statusStore = db.createObjectStore('payment_status', { keyPath: 'id' });
+          statusStore.createIndex('month', 'month', { unique: false });
+          statusStore.createIndex('paymentId', 'paymentId', { unique: false });
         }
       };
 
@@ -134,6 +155,128 @@ class GastosDB {
     return all.filter(e => e.date >= startDate && e.date <= endDate);
   }
 
+  // ---- Ingresos (CRUD) ----
+
+  async addIncome(income) {
+    const store = this._transaction('income', 'readwrite');
+    const data = {
+      ...income,
+      month: Utils.monthKeyFromDate(income.date),
+      createdAt: new Date().toISOString()
+    };
+    return this._promisify(store.add(data));
+  }
+
+  async updateIncome(income) {
+    const store = this._transaction('income', 'readwrite');
+    return this._promisify(store.put(income));
+  }
+
+  async deleteIncome(id) {
+    const store = this._transaction('income', 'readwrite');
+    return this._promisify(store.delete(id));
+  }
+
+  async getIncome(id) {
+    const store = this._transaction('income');
+    return this._promisify(store.get(id));
+  }
+
+  async getAllIncome() {
+    const store = this._transaction('income');
+    return this._promisify(store.getAll());
+  }
+
+  async getIncomeByMonth(monthKey) {
+    const store = this._transaction('income');
+    const index = store.index('month');
+    return this._promisify(index.getAll(monthKey));
+  }
+
+  async getIncomeStats(monthKey) {
+    const incomes = await this.getIncomeByMonth(monthKey);
+    const total = incomes.reduce((sum, i) => sum + i.amount, 0);
+
+    const byCategory = {};
+    incomes.forEach(i => {
+      if (!byCategory[i.category]) byCategory[i.category] = 0;
+      byCategory[i.category] += i.amount;
+    });
+
+    return { total, byCategory, count: incomes.length, incomes };
+  }
+
+  // ---- Pagos Recurrentes ----
+
+  async addRecurringPayment(payment) {
+    const store = this._transaction('recurring_payments', 'readwrite');
+    const data = {
+      ...payment,
+      createdAt: new Date().toISOString()
+    };
+    return this._promisify(store.add(data));
+  }
+
+  async updateRecurringPayment(payment) {
+    const store = this._transaction('recurring_payments', 'readwrite');
+    return this._promisify(store.put(payment));
+  }
+
+  async deleteRecurringPayment(id) {
+    const store = this._transaction('recurring_payments', 'readwrite');
+    return this._promisify(store.delete(id));
+  }
+
+  async getRecurringPayment(id) {
+    const store = this._transaction('recurring_payments');
+    return this._promisify(store.get(id));
+  }
+
+  async getAllRecurringPayments() {
+    const store = this._transaction('recurring_payments');
+    return this._promisify(store.getAll());
+  }
+
+  // ---- Estado de Pagos Recurrentes (por mes) ----
+
+  _paymentStatusId(paymentId, monthKey) {
+    return `${paymentId}_${monthKey}`;
+  }
+
+  async getPaymentStatus(paymentId, monthKey) {
+    const store = this._transaction('payment_status');
+    const id = this._paymentStatusId(paymentId, monthKey);
+    const result = await this._promisify(store.get(id));
+    return result ? result.paid : false;
+  }
+
+  async togglePaymentStatus(paymentId, monthKey) {
+    const id = this._paymentStatusId(paymentId, monthKey);
+    const store = this._transaction('payment_status', 'readwrite');
+    const existing = await this._promisify(store.get(id));
+
+    const newStatus = {
+      id,
+      paymentId,
+      month: monthKey,
+      paid: existing ? !existing.paid : true,
+      paidAt: new Date().toISOString()
+    };
+
+    // Need a new transaction since the previous one may have closed
+    const writeStore = this._transaction('payment_status', 'readwrite');
+    return this._promisify(writeStore.put(newStatus));
+  }
+
+  async getMonthPaymentStatuses(monthKey) {
+    const store = this._transaction('payment_status');
+    const index = store.index('month');
+    const statuses = await this._promisify(index.getAll(monthKey));
+    const map = {};
+    statuses.forEach(s => { map[s.paymentId] = s.paid; });
+    return map;
+  }
+
   // ---- Presupuestos ----
 
   async setBudget(monthKey, amount) {
@@ -164,6 +307,7 @@ class GastosDB {
   async getMonthStats(monthKey) {
     const expenses = await this.getExpensesByMonth(monthKey);
     const budget = await this.getBudget(monthKey);
+    const incomeStats = await this.getIncomeStats(monthKey);
 
     const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -197,6 +341,8 @@ class GastosDB {
 
     return {
       total,
+      totalIncome: incomeStats.total,
+      balance: incomeStats.total - total,
       budget: budget ? budget.amount : null,
       byCategory,
       byPaymentSource,
@@ -227,10 +373,9 @@ class GastosDB {
   }
 
   async clearAll() {
-    const tx = this.db.transaction(['expenses', 'budgets', 'settings'], 'readwrite');
-    tx.objectStore('expenses').clear();
-    tx.objectStore('budgets').clear();
-    tx.objectStore('settings').clear();
+    const storeNames = ['expenses', 'budgets', 'settings', 'income', 'recurring_payments', 'payment_status'];
+    const tx = this.db.transaction(storeNames, 'readwrite');
+    storeNames.forEach(name => tx.objectStore(name).clear());
     return new Promise((resolve, reject) => {
       tx.oncomplete = resolve;
       tx.onerror = () => reject(tx.error);

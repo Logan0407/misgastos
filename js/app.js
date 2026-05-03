@@ -9,8 +9,12 @@ class MisGastosApp {
     this.currentView = 'dashboard';
     this.selectedCategory = null;
     this.selectedPaymentSource = 'debito';
+    this.selectedIncomeCategory = null;
     this.editingExpense = null;
+    this.editingIncome = null;
+    this.editingPayment = null;
     this.swipedItem = null;
+    this.historyTab = 'expenses';
   }
 
   // ---- Inicialización ----
@@ -18,12 +22,17 @@ class MisGastosApp {
   async init() {
     try {
       await this.db.init();
+      await this.loadTheme();
       this.charts.setupDefaults();
       this.setupNavigation();
       this.setupAddForm();
+      this.setupIncomeForm();
+      this.setupPayments();
       this.setupFilters();
       this.setupSettings();
       this.setupEditModal();
+      this.setupEditIncomeModal();
+      this.setupHistoryTabs();
       this.updateHeader();
       await this.refreshDashboard();
       this.registerServiceWorker();
@@ -90,6 +99,10 @@ class MisGastosApp {
       await this.refreshHistory();
     } else if (viewName === 'add') {
       this.resetAddForm();
+    } else if (viewName === 'income') {
+      this.resetIncomeForm();
+    } else if (viewName === 'payments') {
+      await this.refreshPayments();
     } else if (viewName === 'settings') {
       await this.loadSettings();
     }
@@ -101,8 +114,17 @@ class MisGastosApp {
     const monthKey = Utils.currentMonthKey();
     const stats = await this.db.getMonthStats(monthKey);
 
-    // Totales
+    // Balance
+    const balanceEl = document.getElementById('month-balance');
+    balanceEl.textContent = Utils.formatCurrency(Math.abs(stats.balance));
+    balanceEl.className = 'card-amount ' + (stats.balance >= 0 ? 'balance-positive' : 'balance-negative');
+    if (stats.balance < 0) balanceEl.textContent = '-' + balanceEl.textContent;
+
+    // Income & Expense totals
+    document.getElementById('month-income-total').textContent = Utils.formatCurrency(stats.totalIncome);
     document.getElementById('month-total').textContent = Utils.formatCurrency(stats.total);
+
+    // Today & Week
     document.getElementById('today-total').textContent = Utils.formatCurrency(await this.db.getTodayTotal());
     document.getElementById('week-total').textContent = Utils.formatCurrency(await this.db.getWeekTotal());
 
@@ -115,14 +137,9 @@ class MisGastosApp {
       budgetBar.classList.add('visible');
       const pct = Math.min((stats.total / stats.budget) * 100, 100);
       budgetFill.style.width = pct + '%';
-
       budgetFill.classList.remove('warning', 'danger');
-      if (pct >= 90) {
-        budgetFill.classList.add('danger');
-      } else if (pct >= 70) {
-        budgetFill.classList.add('warning');
-      }
-
+      if (pct >= 90) budgetFill.classList.add('danger');
+      else if (pct >= 70) budgetFill.classList.add('warning');
       const remaining = stats.budget - stats.total;
       budgetLabel.textContent = remaining > 0
         ? `Quedan ${Utils.formatCurrency(remaining)} de ${Utils.formatCurrency(stats.budget)}`
@@ -132,15 +149,11 @@ class MisGastosApp {
       budgetLabel.textContent = '';
     }
 
-    // Animate total
-    const totalEl = document.getElementById('month-total');
-    totalEl.classList.remove('saved-pulse');
-    void totalEl.offsetWidth; // reflow
-    totalEl.classList.add('saved-pulse');
+    // Payments summary
+    await this.renderPaymentsSummary(monthKey);
 
     // Charts
     this.charts.renderCategoryChart('category-chart', stats.byCategory);
-
     const last7 = Utils.lastNDays(7);
     const byDayLast7 = {};
     last7.forEach(d => byDayLast7[d] = stats.byDay[d] || 0);
@@ -148,6 +161,25 @@ class MisGastosApp {
 
     // Recent expenses
     this.renderRecentExpenses(stats.expenses);
+  }
+
+  async renderPaymentsSummary(monthKey) {
+    const payments = await this.db.getAllRecurringPayments();
+    const card = document.getElementById('payments-summary-card');
+    const content = document.getElementById('payments-summary-content');
+    if (!payments.length) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    const statuses = await this.db.getMonthPaymentStatuses(monthKey);
+    const paid = payments.filter(p => statuses[p.id]).length;
+    const pending = payments.length - paid;
+    const pendingAmount = payments.filter(p => !statuses[p.id]).reduce((s, p) => s + p.amount, 0);
+    let html = `<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:10px">${paid}/${payments.length} pagados · Pendiente: <strong style="color:var(--warning)">${Utils.formatCurrency(pendingAmount)}</strong></div>`;
+    payments.sort((a, b) => a.dueDay - b.dueDay).slice(0, 5).forEach(p => {
+      const isPaid = statuses[p.id] || false;
+      const type = DEFAULT_RECURRING_TYPES.find(t => t.id === p.type) || DEFAULT_RECURRING_TYPES[7];
+      html += `<div class="payments-summary-item"><div class="payments-summary-left"><span class="payments-summary-status ${isPaid ? 'done' : 'pending'}"></span><span style="font-size:0.85rem">${type.icon} ${p.name}</span></div><span style="font-size:0.85rem;font-weight:600">${Utils.formatCurrency(p.amount)}</span></div>`;
+    });
+    content.innerHTML = html;
   }
 
   renderRecentExpenses(expenses) {
@@ -334,6 +366,10 @@ class MisGastosApp {
   }
 
   async refreshHistory() {
+    if (this.historyTab === 'income') {
+      await this.refreshIncomeHistory();
+      return;
+    }
     const period = document.getElementById('filter-period').value;
     const category = document.getElementById('filter-category').value;
     const activePaymentBtn = document.querySelector('.payment-filter-btn.active');
@@ -427,6 +463,42 @@ class MisGastosApp {
     container.innerHTML = html;
     this._setupSwipeHandlers(container);
     this._setupTapToEdit(container);
+  }
+
+  async refreshIncomeHistory() {
+    const period = document.getElementById('filter-period').value;
+    let incomes;
+    const today = Utils.today();
+    switch (period) {
+      case 'today': incomes = (await this.db.getAllIncome()).filter(i => i.date === today); break;
+      case 'week': incomes = (await this.db.getAllIncome()).filter(i => i.date >= Utils.weekStart() && i.date <= today); break;
+      case 'month': incomes = await this.db.getIncomeByMonth(Utils.currentMonthKey()); break;
+      default: incomes = await this.db.getAllIncome();
+    }
+    incomes.sort((a, b) => { if (a.date !== b.date) return b.date.localeCompare(a.date); return b.id - a.id; });
+    const container = document.getElementById('history-list');
+    if (!incomes.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">💰</div><div class="empty-state-text">No hay ingresos en este período</div></div>`;
+      return;
+    }
+    const total = incomes.reduce((s, i) => s + i.amount, 0);
+    const groups = {};
+    incomes.forEach(i => { if (!groups[i.date]) groups[i.date] = []; groups[i.date].push(i); });
+    let html = `<div class="history-summary animate-in"><span class="history-summary-label">${incomes.length} ingreso${incomes.length !== 1 ? 's' : ''}</span><span class="history-summary-amount">${Utils.formatCurrency(total)}</span></div>`;
+    Object.entries(groups).forEach(([date, items], idx) => {
+      const dayTotal = items.reduce((s, i) => s + i.amount, 0);
+      html += `<div class="date-group animate-in" style="animation-delay:${idx * 0.04}s"><div class="date-group-header"><span class="date-group-label">${Utils.relativeDate(date)}</span><span class="date-group-total">${Utils.formatCurrency(dayTotal)}</span></div>`;
+      items.forEach(inc => {
+        const cat = DEFAULT_INCOME_CATEGORIES.find(c => c.id === inc.category) || DEFAULT_INCOME_CATEGORIES[5];
+        html += `<div class="expense-item" data-id="${inc.id}" data-type="income"><div class="expense-icon" style="background:${cat.color}20;color:${cat.color}">${cat.icon}</div><div class="expense-info"><div class="expense-description">${inc.description}</div><div class="expense-meta"><span>${cat.name}</span></div></div><div class="expense-amount" style="color:#00e5a0">+${Utils.formatCurrency(inc.amount)}</div></div>`;
+      });
+      html += '</div>';
+    });
+    container.innerHTML = html;
+    // Tap to edit income
+    container.querySelectorAll('.expense-item[data-type="income"]').forEach(item => {
+      item.addEventListener('click', () => { this.openEditIncomeModal(Number(item.dataset.id)); });
+    });
   }
 
   _expenseItemHTML(exp) {
@@ -667,9 +739,301 @@ class MisGastosApp {
     );
   }
 
+  // ---- Agregar Ingreso ----
+
+  setupIncomeForm() {
+    const amountInput = document.getElementById('income-amount');
+    const descInput = document.getElementById('income-description');
+    const dateInput = document.getElementById('income-date');
+    const saveBtn = document.getElementById('save-income');
+
+    amountInput.addEventListener('input', () => {
+      amountInput.value = Utils.formatAmountInput(amountInput.value);
+    });
+    dateInput.value = Utils.today();
+    this.renderIncomeCategories();
+    saveBtn.addEventListener('click', () => this.saveIncome());
+  }
+
+  renderIncomeCategories() {
+    const grid = document.getElementById('income-category-grid');
+    if (!grid) return;
+    grid.innerHTML = DEFAULT_INCOME_CATEGORIES.map(cat => `
+      <button class="category-btn" data-id="${cat.id}" type="button">
+        <span class="category-btn-icon">${cat.icon}</span>
+        <span class="category-btn-label">${cat.name}</span>
+      </button>
+    `).join('');
+    grid.querySelectorAll('.category-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.category-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this.selectedIncomeCategory = btn.dataset.id;
+      });
+    });
+  }
+
+  async saveIncome() {
+    const amount = Utils.parseCurrency(document.getElementById('income-amount').value);
+    const description = document.getElementById('income-description').value.trim();
+    const date = document.getElementById('income-date').value;
+    const category = this.selectedIncomeCategory;
+    if (!amount || amount <= 0) { Utils.showToast('Ingresa un monto válido', 'error'); return; }
+    if (!description) { Utils.showToast('Agrega una descripción', 'error'); return; }
+    if (!category) { Utils.showToast('Selecciona una categoría', 'error'); return; }
+    try {
+      await this.db.addIncome({ amount, description, date, category });
+      const btn = document.getElementById('save-income');
+      btn.classList.add('saved');
+      Utils.showToast(`${description} — ${Utils.formatCurrency(amount)} guardado ✓`);
+      setTimeout(() => { btn.classList.remove('saved'); this.resetIncomeForm(); this.navigateTo('dashboard'); }, 600);
+    } catch (err) { console.error('Error guardando ingreso:', err); Utils.showToast('Error al guardar', 'error'); }
+  }
+
+  resetIncomeForm() {
+    document.getElementById('income-amount').value = '';
+    document.getElementById('income-description').value = '';
+    document.getElementById('income-date').value = Utils.today();
+    document.querySelectorAll('#income-category-grid .category-btn').forEach(b => b.classList.remove('selected'));
+    this.selectedIncomeCategory = null;
+    setTimeout(() => { if (this.currentView === 'income') document.getElementById('income-amount').focus(); }, 350);
+  }
+
+  // ---- Pagos Recurrentes ----
+
+  setupPayments() {
+    document.getElementById('btn-add-payment').addEventListener('click', () => this.openPaymentModal());
+    const paymentAmountInput = document.getElementById('payment-amount');
+    paymentAmountInput.addEventListener('input', () => { paymentAmountInput.value = Utils.formatAmountInput(paymentAmountInput.value); });
+    this.renderPaymentTypeGrid();
+    document.getElementById('payment-cancel').addEventListener('click', () => this.closePaymentModal());
+    document.getElementById('payment-save').addEventListener('click', () => this.savePayment());
+  }
+
+  renderPaymentTypeGrid() {
+    const grid = document.getElementById('payment-type-grid');
+    if (!grid) return;
+    grid.innerHTML = DEFAULT_RECURRING_TYPES.map(t => `
+      <button class="category-btn" data-id="${t.id}" type="button">
+        <span class="category-btn-icon">${t.icon}</span>
+        <span class="category-btn-label">${t.name}</span>
+      </button>
+    `).join('');
+    grid.querySelectorAll('.category-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.category-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+  }
+
+  openPaymentModal(payment = null) {
+    this.editingPayment = payment;
+    const modal = document.getElementById('add-payment-modal');
+    const title = document.getElementById('payment-modal-title');
+    title.textContent = payment ? 'Editar Pago Recurrente' : 'Agregar Pago Recurrente';
+    document.getElementById('payment-name').value = payment ? payment.name : '';
+    document.getElementById('payment-amount').value = payment ? Utils.formatAmountInput(payment.amount.toString()) : '';
+    document.getElementById('payment-due-day').value = payment ? payment.dueDay : '';
+    document.querySelectorAll('#payment-type-grid .category-btn').forEach(b => b.classList.remove('selected'));
+    if (payment) {
+      const btn = document.querySelector(`#payment-type-grid [data-id="${payment.type}"]`);
+      if (btn) btn.classList.add('selected');
+    }
+    modal.classList.add('active');
+  }
+
+  closePaymentModal() {
+    document.getElementById('add-payment-modal').classList.remove('active');
+    this.editingPayment = null;
+  }
+
+  async savePayment() {
+    const name = document.getElementById('payment-name').value.trim();
+    const amount = Utils.parseCurrency(document.getElementById('payment-amount').value);
+    const dueDay = parseInt(document.getElementById('payment-due-day').value) || 0;
+    const selectedType = document.querySelector('#payment-type-grid .category-btn.selected');
+    const type = selectedType ? selectedType.dataset.id : null;
+    if (!name) { Utils.showToast('Ingresa un nombre', 'error'); return; }
+    if (!amount) { Utils.showToast('Ingresa un monto', 'error'); return; }
+    if (dueDay < 1 || dueDay > 31) { Utils.showToast('Día inválido (1-31)', 'error'); return; }
+    if (!type) { Utils.showToast('Selecciona un tipo', 'error'); return; }
+    try {
+      if (this.editingPayment) {
+        await this.db.updateRecurringPayment({ ...this.editingPayment, name, amount, dueDay, type });
+        Utils.showToast('Pago actualizado ✓');
+      } else {
+        await this.db.addRecurringPayment({ name, amount, dueDay, type });
+        Utils.showToast('Pago agregado ✓');
+      }
+      this.closePaymentModal();
+      await this.refreshPayments();
+    } catch (err) { console.error('Error guardando pago:', err); Utils.showToast('Error al guardar', 'error'); }
+  }
+
+  async refreshPayments() {
+    const payments = await this.db.getAllRecurringPayments();
+    const monthKey = Utils.currentMonthKey();
+    const statuses = await this.db.getMonthPaymentStatuses(monthKey);
+    const container = document.getElementById('recurring-payments-list');
+    const paid = payments.filter(p => statuses[p.id]).length;
+    const pct = payments.length ? (paid / payments.length) * 100 : 0;
+    document.getElementById('payments-progress-text').textContent = `${paid} de ${payments.length} pagados`;
+    document.getElementById('payments-progress-fill').style.width = pct + '%';
+    if (!payments.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📋</div><div class="empty-state-text">No hay pagos recurrentes<br>Agrega tus pagos mensuales</div></div>`;
+      return;
+    }
+    payments.sort((a, b) => a.dueDay - b.dueDay);
+    container.innerHTML = payments.map(p => {
+      const isPaid = statuses[p.id] || false;
+      const type = DEFAULT_RECURRING_TYPES.find(t => t.id === p.type) || DEFAULT_RECURRING_TYPES[7];
+      return `
+        <div class="recurring-item ${isPaid ? 'paid' : ''}" data-id="${p.id}">
+          <div class="recurring-icon" style="background:${type.color}20;color:${type.color}">${type.icon}</div>
+          <div class="recurring-info">
+            <div class="recurring-name">${p.name}</div>
+            <div class="recurring-meta">Vence día ${p.dueDay} · ${type.name}</div>
+          </div>
+          <div class="recurring-amount">${Utils.formatCurrency(p.amount)}</div>
+          <button class="recurring-delete-btn" data-id="${p.id}">🗑️</button>
+          <div class="recurring-check" data-id="${p.id}">${isPaid ? '✓' : ''}</div>
+        </div>`;
+    }).join('');
+    container.querySelectorAll('.recurring-check').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = Number(btn.dataset.id);
+        await this.db.togglePaymentStatus(id, monthKey);
+        await this.refreshPayments();
+      });
+    });
+    container.querySelectorAll('.recurring-delete-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const id = Number(btn.dataset.id);
+        this.showConfirm('¿Eliminar pago?', 'Se eliminará este pago recurrente.', async () => {
+          await this.db.deleteRecurringPayment(id);
+          Utils.showToast('Pago eliminado');
+          await this.refreshPayments();
+        });
+      });
+    });
+    container.querySelectorAll('.recurring-item').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        if (e.target.closest('.recurring-check') || e.target.closest('.recurring-delete-btn')) return;
+        const id = Number(item.dataset.id);
+        const payment = await this.db.getRecurringPayment(id);
+        if (payment) this.openPaymentModal(payment);
+      });
+    });
+  }
+
+  // ---- Theme ----
+
+  async loadTheme() {
+    const theme = await this.db.getSetting('theme') || 'dark';
+    this.applyTheme(theme);
+  }
+
+  applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const metaTheme = document.getElementById('meta-theme-color');
+    if (metaTheme) metaTheme.content = theme === 'light' ? '#e8e6ef' : '#131320';
+    document.querySelectorAll('.theme-option').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+    // Update chart colors
+    if (this.charts) this.charts.updateTheme(theme);
+  }
+
+  // ---- History Tabs ----
+
+  setupHistoryTabs() {
+    document.querySelectorAll('.history-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.history-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        this.historyTab = tab.dataset.tab;
+        const psFilter = document.getElementById('payment-source-filter-container');
+        psFilter.style.display = this.historyTab === 'income' ? 'none' : '';
+        this.refreshHistory();
+      });
+    });
+  }
+
+  // ---- Edit Income Modal ----
+
+  setupEditIncomeModal() {
+    const overlay = document.getElementById('edit-income-modal');
+    if (!overlay) return;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) this.closeEditIncomeModal(); });
+    document.getElementById('edit-income-cancel').addEventListener('click', () => this.closeEditIncomeModal());
+    document.getElementById('edit-income-save').addEventListener('click', () => this.saveIncomeEdit());
+    document.getElementById('edit-income-delete').addEventListener('click', () => this.deleteFromIncomeEdit());
+    const amountInput = document.getElementById('edit-income-amount');
+    amountInput.addEventListener('input', () => { amountInput.value = Utils.formatAmountInput(amountInput.value); });
+  }
+
+  async openEditIncomeModal(id) {
+    const income = await this.db.getIncome(id);
+    if (!income) return;
+    this.editingIncome = income;
+    document.getElementById('edit-income-amount').value = Utils.formatAmountInput(income.amount.toString());
+    document.getElementById('edit-income-description').value = income.description;
+    document.getElementById('edit-income-date').value = income.date;
+    const catSelect = document.getElementById('edit-income-category');
+    catSelect.innerHTML = DEFAULT_INCOME_CATEGORIES.map(c =>
+      `<option value="${c.id}" ${c.id === income.category ? 'selected' : ''}>${c.icon} ${c.name}</option>`
+    ).join('');
+    document.getElementById('edit-income-modal').classList.add('active');
+  }
+
+  closeEditIncomeModal() {
+    document.getElementById('edit-income-modal').classList.remove('active');
+    this.editingIncome = null;
+  }
+
+  async saveIncomeEdit() {
+    if (!this.editingIncome) return;
+    const amount = Utils.parseCurrency(document.getElementById('edit-income-amount').value);
+    const description = document.getElementById('edit-income-description').value.trim();
+    const date = document.getElementById('edit-income-date').value;
+    const category = document.getElementById('edit-income-category').value;
+    if (!amount || !description) { Utils.showToast('Completa todos los campos', 'error'); return; }
+    try {
+      await this.db.updateIncome({ ...this.editingIncome, amount, description, date, category, month: Utils.monthKeyFromDate(date) });
+      this.closeEditIncomeModal();
+      Utils.showToast('Ingreso actualizado ✓');
+      if (this.currentView === 'history') await this.refreshHistory();
+      else if (this.currentView === 'dashboard') await this.refreshDashboard();
+    } catch (err) { console.error('Error actualizando:', err); Utils.showToast('Error al actualizar', 'error'); }
+  }
+
+  async deleteFromIncomeEdit() {
+    if (!this.editingIncome) return;
+    this.showConfirm('¿Eliminar ingreso?', `${this.editingIncome.description} — ${Utils.formatCurrency(this.editingIncome.amount)}`, async () => {
+      await this.db.deleteIncome(this.editingIncome.id);
+      this.closeEditIncomeModal();
+      Utils.showToast('Ingreso eliminado');
+      if (this.currentView === 'history') await this.refreshHistory();
+      else await this.refreshDashboard();
+    });
+  }
+
   // ---- Settings ----
 
   async setupSettings() {
+    // Theme toggle
+    document.querySelectorAll('.theme-option').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const theme = btn.dataset.theme;
+        this.applyTheme(theme);
+        await this.db.setSetting('theme', theme);
+        Utils.showToast(`Tema ${theme === 'dark' ? 'oscuro' : 'claro'} aplicado`);
+      });
+    });
+
     // Budget
     const budgetInput = document.getElementById('budget-amount');
     const saveBudgetBtn = document.getElementById('save-budget');

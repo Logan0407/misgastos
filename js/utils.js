@@ -207,3 +207,25 @@ const DEFAULT_CATEGORIES = [
   { id: 'ropa', name: 'Ropa', icon: '👕', color: '#ec4899' },
   { id: 'otros', name: 'Otros', icon: '📦', color: '#6b7280' }
 ];
+
+// Categorías de ingreso
+const DEFAULT_INCOME_CATEGORIES = [
+  { id: 'sueldo', name: 'Sueldo', icon: '💼', color: '#22c55e' },
+  { id: 'bonus', name: 'Bonus', icon: '🎁', color: '#f59e0b' },
+  { id: 'freelance', name: 'Freelance', icon: '💻', color: '#3b82f6' },
+  { id: 'inversiones', name: 'Inversiones', icon: '📈', color: '#a855f7' },
+  { id: 'prestamo', name: 'Préstamo', icon: '🤝', color: '#ec4899' },
+  { id: 'otro_ingreso', name: 'Otro', icon: '📦', color: '#6b7280' }
+];
+
+// Tipos de pago recurrente
+const DEFAULT_RECURRING_TYPES = [
+  { id: 'tarjeta', name: 'Tarjeta Crédito', icon: '💳', color: '#ef4444' },
+  { id: 'arriendo', name: 'Arriendo', icon: '🏠', color: '#f59e0b' },
+  { id: 'celular', name: 'Celular', icon: '📱', color: '#3b82f6' },
+  { id: 'streaming', name: 'Streaming', icon: '📺', color: '#a855f7' },
+  { id: 'servicios', name: 'Servicios', icon: '🔌', color: '#22c55e' },
+  { id: 'seguro', name: 'Seguro', icon: '🛡️', color: '#4ecdc4' },
+  { id: 'mensualidad', name: 'Mensualidad', icon: '📅', color: '#ec4899' },
+  { id: 'otro_pago', name: 'Otro', icon: '📦', color: '#6b7280' }
+];
