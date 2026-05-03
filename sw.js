@@ -2,7 +2,7 @@
 // MisGastos — Service Worker (Offline Support)
 // ============================================
 
-const CACHE_NAME = 'misgastos-v2';
+const CACHE_NAME = 'misgastos-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -38,32 +38,42 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Fetch: cache-first strategy
+// Fetch: network-first for local, cache-first for CDN
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  event.respondWith(
-    caches.match(event.request)
-      .then(cached => {
-        if (cached) return cached;
+  const url = new URL(event.request.url);
+  const isLocal = url.origin === location.origin;
 
-        return fetch(event.request)
-          .then(response => {
-            // Cache successful responses
-            if (response.status === 200) {
-              const clone = response.clone();
-              caches.open(CACHE_NAME)
-                .then(cache => cache.put(event.request, clone));
-            }
-            return response;
-          })
-          .catch(() => {
-            // Offline fallback for navigation
-            if (event.request.mode === 'navigate') {
-              return caches.match('./index.html');
-            }
-          });
+  if (isLocal) {
+    // Network first for local files (always get latest)
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then(cached => {
+          if (cached) return cached;
+          if (event.request.mode === 'navigate') return caches.match('./index.html');
+        }))
+    );
+  } else {
+    // Cache first for CDN resources
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        if (cached) return cached;
+        return fetch(event.request).then(response => {
+          if (response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
+          return response;
+        });
       })
-  );
+    );
+  }
 });
