@@ -52,6 +52,15 @@
               </div>
             </div>
           </div>
+          <div class="balance-details cc-balance-row" id="cc-balance-row" style="display:none;">
+            <div class="balance-detail cc-detail">
+              <span class="balance-detail-icon">💳</span>
+              <div>
+                <span class="balance-detail-label">Pagos Tarjetas</span>
+                <span class="balance-detail-amount" id="month-cc-total">$0</span>
+              </div>
+            </div>
+          </div>
           <div class="budget-bar" id="budget-bar">
             <div class="budget-fill" id="budget-fill"></div>
           </div>
@@ -171,6 +180,9 @@
         </div>
 
         <input type="text" id="cc-description" placeholder="Descripción (ej: pago mínimo, total)" autocomplete="off" class="cc-input">
+
+        <label class="form-label">💼 De dónde sale</label>
+        <div class="cc-source-grid" id="cc-source-grid"></div>
 
         <label class="form-label">🏦 Banco</label>
         <div class="bank-grid" id="bank-grid"></div>
@@ -388,6 +400,7 @@
       <div class="modal-form">
         <input type="text" id="edit-cc-amount" inputmode="numeric" placeholder="Monto" autocomplete="off">
         <input type="text" id="edit-cc-description" placeholder="Descripción" autocomplete="off">
+        <select id="edit-cc-source"></select>
         <select id="edit-cc-bank"></select>
         <input type="date" id="edit-cc-date">
         <div class="modal-actions">

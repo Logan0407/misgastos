@@ -245,3 +245,12 @@ const DEFAULT_BANKS = [
   { id: 'consorcio', name: 'Consorcio', icon: '🏦', color: '#4338ca' },
   { id: 'otro_banco', name: 'Otro', icon: '🏦', color: '#6b7280' }
 ];
+
+// Fuentes de pago para tarjeta de crédito (de dónde sale la plata)
+const DEFAULT_CC_SOURCES = [
+  { id: 'sueldo', name: 'Sueldo', icon: '💼', color: '#22c55e' },
+  { id: 'ahorros', name: 'Ahorros', icon: '💰', color: '#f59e0b' },
+  { id: 'cuenta_corriente', name: 'Cta. Corriente', icon: '🏧', color: '#3b82f6' },
+  { id: 'cuenta_vista', name: 'Cuenta Vista', icon: '💳', color: '#8b5cf6' },
+  { id: 'otro_fuente', name: 'Otro', icon: '📦', color: '#6b7280' }
+];

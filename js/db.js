@@ -371,6 +371,7 @@ class GastosDB {
     const expenses = await this.getExpensesByMonth(monthKey);
     const budget = await this.getBudget(monthKey);
     const incomeStats = await this.getIncomeStats(monthKey);
+    const ccStats = await this.getCCPaymentStats(monthKey);
 
     const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -405,7 +406,8 @@ class GastosDB {
     return {
       total,
       totalIncome: incomeStats.total,
-      balance: incomeStats.total - total,
+      totalCCPayments: ccStats.total,
+      balance: incomeStats.total - total - ccStats.total,
       budget: budget ? budget.amount : null,
       byCategory,
       byPaymentSource,

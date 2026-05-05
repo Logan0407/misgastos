@@ -15,6 +15,7 @@ class MisGastosApp {
     this.editingPayment = null;
     this.editingCCPayment = null;
     this.selectedBank = null;
+    this.selectedCCSource = null;
     this.swipedItem = null;
     this.historyTab = 'expenses';
   }
@@ -130,6 +131,16 @@ class MisGastosApp {
     // Income & Expense totals
     document.getElementById('month-income-total').textContent = Utils.formatCurrency(stats.totalIncome);
     document.getElementById('month-total').textContent = Utils.formatCurrency(stats.total);
+
+    // CC Payments total in balance card
+    const ccRow = document.getElementById('cc-balance-row');
+    const ccTotalEl = document.getElementById('month-cc-total');
+    if (stats.totalCCPayments > 0) {
+      ccRow.style.display = '';
+      ccTotalEl.textContent = Utils.formatCurrency(stats.totalCCPayments);
+    } else {
+      ccRow.style.display = 'none';
+    }
 
     // Today & Week
     document.getElementById('today-total').textContent = Utils.formatCurrency(await this.db.getTodayTotal());
@@ -945,9 +956,29 @@ class MisGastosApp {
     });
 
     document.getElementById('cc-date').value = Utils.today();
+    this.renderCCSourceGrid();
     this.renderBankGrid();
 
     document.getElementById('save-cc-payment').addEventListener('click', () => this.saveCCPayment());
+  }
+
+  renderCCSourceGrid() {
+    const grid = document.getElementById('cc-source-grid');
+    if (!grid) return;
+    grid.innerHTML = DEFAULT_CC_SOURCES.map(src => `
+      <button class="cc-source-btn" data-id="${src.id}" type="button">
+        <span class="cc-source-btn-icon">${src.icon}</span>
+        <span class="cc-source-btn-label">${src.name}</span>
+      </button>
+    `).join('');
+
+    grid.querySelectorAll('.cc-source-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.cc-source-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this.selectedCCSource = btn.dataset.id;
+      });
+    });
   }
 
   renderBankGrid() {
@@ -974,12 +1005,14 @@ class MisGastosApp {
     const description = document.getElementById('cc-description').value.trim();
     const date = document.getElementById('cc-date').value;
     const bank = this.selectedBank;
+    const source = this.selectedCCSource;
 
     if (!amount || amount <= 0) { Utils.showToast('Ingresa un monto válido', 'error'); return; }
+    if (!source) { Utils.showToast('Selecciona de dónde sale el pago', 'error'); return; }
     if (!bank) { Utils.showToast('Selecciona un banco', 'error'); return; }
 
     try {
-      await this.db.addCCPayment({ amount, description: description || 'Pago tarjeta', date, bank });
+      await this.db.addCCPayment({ amount, description: description || 'Pago tarjeta', date, bank, source });
       const btn = document.getElementById('save-cc-payment');
       btn.classList.add('saved');
       const bankName = DEFAULT_BANKS.find(b => b.id === bank)?.name || bank;
@@ -1000,7 +1033,9 @@ class MisGastosApp {
     document.getElementById('cc-description').value = '';
     document.getElementById('cc-date').value = Utils.today();
     document.querySelectorAll('#bank-grid .bank-btn').forEach(b => b.classList.remove('selected'));
+    document.querySelectorAll('#cc-source-grid .cc-source-btn').forEach(b => b.classList.remove('selected'));
     this.selectedBank = null;
+    this.selectedCCSource = null;
   }
 
   async refreshCCPayments() {
@@ -1084,6 +1119,7 @@ class MisGastosApp {
       `;
       items.forEach(payment => {
         const bank = DEFAULT_BANKS.find(b => b.id === payment.bank) || DEFAULT_BANKS[DEFAULT_BANKS.length - 1];
+        const src = DEFAULT_CC_SOURCES.find(s => s.id === payment.source) || DEFAULT_CC_SOURCES[DEFAULT_CC_SOURCES.length - 1];
         html += `
           <div class="expense-item cc-payment-item" data-id="${payment.id}">
             <div class="expense-icon" style="background:${bank.color}20;color:${bank.color}">
@@ -1093,6 +1129,8 @@ class MisGastosApp {
               <div class="expense-description">${payment.description || 'Pago tarjeta'}</div>
               <div class="expense-meta">
                 <span>${bank.name}</span>
+                <span>•</span>
+                <span>${src.icon} ${src.name}</span>
               </div>
             </div>
             <div class="expense-amount" style="color:var(--danger)">${Utils.formatCurrency(payment.amount)}</div>
@@ -1142,6 +1180,11 @@ class MisGastosApp {
     document.getElementById('edit-cc-description').value = payment.description || '';
     document.getElementById('edit-cc-date').value = payment.date;
 
+    const sourceSelect = document.getElementById('edit-cc-source');
+    sourceSelect.innerHTML = DEFAULT_CC_SOURCES.map(s =>
+      `<option value="${s.id}" ${s.id === (payment.source || 'sueldo') ? 'selected' : ''}>${s.icon} ${s.name}</option>`
+    ).join('');
+
     const bankSelect = document.getElementById('edit-cc-bank');
     bankSelect.innerHTML = DEFAULT_BANKS.map(b =>
       `<option value="${b.id}" ${b.id === payment.bank ? 'selected' : ''}>${b.icon} ${b.name}</option>`
@@ -1162,6 +1205,7 @@ class MisGastosApp {
     const description = document.getElementById('edit-cc-description').value.trim();
     const date = document.getElementById('edit-cc-date').value;
     const bank = document.getElementById('edit-cc-bank').value;
+    const source = document.getElementById('edit-cc-source').value;
 
     if (!amount) { Utils.showToast('Ingresa un monto válido', 'error'); return; }
 
@@ -1172,6 +1216,7 @@ class MisGastosApp {
         description: description || 'Pago tarjeta',
         date,
         bank,
+        source,
         month: Utils.monthKeyFromDate(date)
       };
 
