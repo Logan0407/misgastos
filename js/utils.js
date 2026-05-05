@@ -229,3 +229,19 @@ const DEFAULT_RECURRING_TYPES = [
   { id: 'mensualidad', name: 'Mensualidad', icon: '📅', color: '#ec4899' },
   { id: 'otro_pago', name: 'Otro', icon: '📦', color: '#6b7280' }
 ];
+
+// Bancos para pagos de tarjeta de crédito
+const DEFAULT_BANKS = [
+  { id: 'banco_estado', name: 'BancoEstado', icon: '🏦', color: '#2563eb' },
+  { id: 'banco_chile', name: 'Banco de Chile', icon: '🏦', color: '#dc2626' },
+  { id: 'bci', name: 'BCI', icon: '🏦', color: '#f97316' },
+  { id: 'santander', name: 'Santander', icon: '🏦', color: '#ef4444' },
+  { id: 'scotiabank', name: 'Scotiabank', icon: '🏦', color: '#b91c1c' },
+  { id: 'itau', name: 'Itaú', icon: '🏦', color: '#ea580c' },
+  { id: 'falabella', name: 'Banco Falabella', icon: '🏦', color: '#16a34a' },
+  { id: 'ripley', name: 'Banco Ripley', icon: '🏦', color: '#7c3aed' },
+  { id: 'security', name: 'Security', icon: '🏦', color: '#0284c7' },
+  { id: 'bice', name: 'BICE', icon: '🏦', color: '#0d9488' },
+  { id: 'consorcio', name: 'Consorcio', icon: '🏦', color: '#4338ca' },
+  { id: 'otro_banco', name: 'Otro', icon: '🏦', color: '#6b7280' }
+];

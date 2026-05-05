@@ -156,6 +156,46 @@
       </button>
     </section>
 
+    <!-- ── Pagos Tarjeta de Crédito ── -->
+    <section id="view-ccpayments" class="view">
+      <div class="cc-header">
+        <h2>💳 Pagos de Tarjeta</h2>
+        <p class="cc-subtitle">Registra los pagos a tus tarjetas de crédito</p>
+      </div>
+
+      <!-- Formulario rápido de pago -->
+      <div class="cc-form-card card">
+        <div class="amount-input-container cc-amount-container">
+          <span class="currency-symbol cc-symbol">$</span>
+          <input type="text" id="cc-amount" inputmode="numeric" placeholder="0" autocomplete="off">
+        </div>
+
+        <input type="text" id="cc-description" placeholder="Descripción (ej: pago mínimo, total)" autocomplete="off" class="cc-input">
+
+        <label class="form-label">🏦 Banco</label>
+        <div class="bank-grid" id="bank-grid"></div>
+
+        <input type="date" id="cc-date" class="cc-input">
+
+        <button id="save-cc-payment" class="btn-primary btn-cc">
+          Registrar Pago
+          <span class="btn-check">✓</span>
+        </button>
+      </div>
+
+      <!-- Resumen del mes -->
+      <div class="card cc-summary-card animate-in" id="cc-summary-card" style="display:none;">
+        <h3>📊 Resumen del Mes</h3>
+        <div id="cc-summary-content"></div>
+      </div>
+
+      <!-- Lista de pagos -->
+      <div class="card animate-in">
+        <h3>Historial de pagos</h3>
+        <div id="cc-payments-list"></div>
+      </div>
+    </section>
+
     <!-- ── Historial ── -->
     <section id="view-history" class="view">
       <div class="history-tabs">
@@ -256,6 +296,15 @@
       </svg>
       <span>Pagos</span>
     </button>
+    <button class="nav-btn" data-view="ccpayments" id="nav-ccpayments">
+      <svg viewBox="0 0 24 24">
+        <rect x="1" y="4" width="22" height="16" rx="2"></rect>
+        <line x1="1" y1="10" x2="23" y2="10"></line>
+        <circle cx="7" cy="15" r="1.5"></circle>
+        <circle cx="12" cy="15" r="1.5"></circle>
+      </svg>
+      <span>Tarjetas</span>
+    </button>
     <button class="nav-btn" data-view="history" id="nav-history">
       <svg viewBox="0 0 24 24">
         <circle cx="12" cy="12" r="9"></circle>
@@ -327,6 +376,25 @@
           <button id="payment-cancel" class="btn-secondary">Cancelar</button>
           <button id="payment-save" class="btn-primary">Guardar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Edit CC Payment Modal ===== -->
+  <div class="modal-overlay" id="edit-cc-modal">
+    <div class="modal-content">
+      <div class="modal-handle"></div>
+      <div class="modal-title">Editar Pago de Tarjeta</div>
+      <div class="modal-form">
+        <input type="text" id="edit-cc-amount" inputmode="numeric" placeholder="Monto" autocomplete="off">
+        <input type="text" id="edit-cc-description" placeholder="Descripción" autocomplete="off">
+        <select id="edit-cc-bank"></select>
+        <input type="date" id="edit-cc-date">
+        <div class="modal-actions">
+          <button id="edit-cc-cancel" class="btn-secondary">Cancelar</button>
+          <button id="edit-cc-save" class="btn-primary btn-cc">Guardar</button>
+        </div>
+        <button id="edit-cc-delete" class="btn-danger" style="margin-top: 4px;">🗑️ Eliminar</button>
       </div>
     </div>
   </div>

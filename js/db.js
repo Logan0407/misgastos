@@ -3,7 +3,7 @@
 // ============================================
 
 const DB_NAME = 'MisGastosDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 class GastosDB {
   constructor() {
@@ -64,6 +64,14 @@ class GastosDB {
           const statusStore = db.createObjectStore('payment_status', { keyPath: 'id' });
           statusStore.createIndex('month', 'month', { unique: false });
           statusStore.createIndex('paymentId', 'paymentId', { unique: false });
+        }
+
+        // v4: Store de pagos de tarjeta de crédito
+        if (!db.objectStoreNames.contains('cc_payments')) {
+          const ccStore = db.createObjectStore('cc_payments', { keyPath: 'id', autoIncrement: true });
+          ccStore.createIndex('date', 'date', { unique: false });
+          ccStore.createIndex('month', 'month', { unique: false });
+          ccStore.createIndex('bank', 'bank', { unique: false });
         }
       };
 
@@ -277,6 +285,61 @@ class GastosDB {
     return map;
   }
 
+  // ---- Pagos de Tarjeta de Crédito ----
+
+  async addCCPayment(payment) {
+    const store = this._transaction('cc_payments', 'readwrite');
+    const data = {
+      ...payment,
+      month: Utils.monthKeyFromDate(payment.date),
+      createdAt: new Date().toISOString()
+    };
+    return this._promisify(store.add(data));
+  }
+
+  async updateCCPayment(payment) {
+    const store = this._transaction('cc_payments', 'readwrite');
+    return this._promisify(store.put(payment));
+  }
+
+  async deleteCCPayment(id) {
+    const store = this._transaction('cc_payments', 'readwrite');
+    return this._promisify(store.delete(id));
+  }
+
+  async getCCPayment(id) {
+    const store = this._transaction('cc_payments');
+    return this._promisify(store.get(id));
+  }
+
+  async getAllCCPayments() {
+    const store = this._transaction('cc_payments');
+    return this._promisify(store.getAll());
+  }
+
+  async getCCPaymentsByMonth(monthKey) {
+    const store = this._transaction('cc_payments');
+    const index = store.index('month');
+    return this._promisify(index.getAll(monthKey));
+  }
+
+  async getCCPaymentsByBank(bankId) {
+    const store = this._transaction('cc_payments');
+    const index = store.index('bank');
+    return this._promisify(index.getAll(bankId));
+  }
+
+  async getCCPaymentStats(monthKey) {
+    const payments = await this.getCCPaymentsByMonth(monthKey);
+    const total = payments.reduce((sum, p) => sum + p.amount, 0);
+    const byBank = {};
+    payments.forEach(p => {
+      if (!byBank[p.bank]) byBank[p.bank] = 0;
+      byBank[p.bank] += p.amount;
+    });
+    return { total, byBank, count: payments.length, payments };
+  }
+
   // ---- Presupuestos ----
 
   async setBudget(monthKey, amount) {
@@ -373,7 +436,7 @@ class GastosDB {
   }
 
   async clearAll() {
-    const storeNames = ['expenses', 'budgets', 'settings', 'income', 'recurring_payments', 'payment_status'];
+    const storeNames = ['expenses', 'budgets', 'settings', 'income', 'recurring_payments', 'payment_status', 'cc_payments'];
     const tx = this.db.transaction(storeNames, 'readwrite');
     storeNames.forEach(name => tx.objectStore(name).clear());
     return new Promise((resolve, reject) => {

@@ -1487,3 +1487,183 @@ button {
   grid-template-columns: repeat(4, 1fr) !important;
 }
 
+/* ---- Credit Card Payments ---- */
+.cc-header {
+  padding: 12px 0 8px;
+}
+.cc-header h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.cc-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.cc-form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cc-amount-container {
+  background: linear-gradient(145deg, rgba(124, 58, 237, 0.08), rgba(59, 130, 246, 0.06));
+  border-color: rgba(124, 58, 237, 0.18);
+}
+.cc-symbol {
+  color: #7c3aed !important;
+}
+
+.cc-input {
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+.cc-input:focus {
+  border-color: #7c3aed;
+}
+.cc-input::placeholder {
+  color: var(--text-muted);
+}
+
+.btn-cc {
+  background: linear-gradient(135deg, #7c3aed, #3b82f6) !important;
+  color: #ffffff !important;
+}
+
+/* ---- Bank Grid ---- */
+.bank-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.bank-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  padding: 12px 4px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  transition: all 0.2s var(--ease-out);
+  cursor: pointer;
+}
+
+.bank-btn:active {
+  transform: scale(0.95);
+}
+
+.bank-btn.selected {
+  border-color: #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+}
+
+.bank-btn-icon {
+  font-size: 1.3rem;
+}
+
+.bank-btn-label {
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bank-btn.selected .bank-btn-label {
+  color: #7c3aed;
+}
+
+/* ---- CC Summary Card ---- */
+.cc-summary-card {
+  background: linear-gradient(145deg, rgba(124, 58, 237, 0.06), rgba(59, 130, 246, 0.04));
+  border-color: rgba(124, 58, 237, 0.12);
+}
+
+.cc-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 14px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.cc-total-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.cc-total-amount {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.cc-bank-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cc-bank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cc-bank-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cc-bank-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+.cc-bank-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.cc-bank-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cc-bank-amount {
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.cc-bank-pct {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  background: var(--bg-card);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* ---- CC Payment Item ---- */
+.cc-payment-item {
+  cursor: pointer;
+}
+.cc-payment-item:active {
+  background: var(--bg-card-hover);
+  border-radius: var(--radius-sm);
+}
+

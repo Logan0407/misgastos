@@ -13,6 +13,8 @@ class MisGastosApp {
     this.editingExpense = null;
     this.editingIncome = null;
     this.editingPayment = null;
+    this.editingCCPayment = null;
+    this.selectedBank = null;
     this.swipedItem = null;
     this.historyTab = 'expenses';
   }
@@ -32,6 +34,8 @@ class MisGastosApp {
       this.setupSettings();
       this.setupEditModal();
       this.setupEditIncomeModal();
+      this.setupCCPayments();
+      this.setupEditCCModal();
       this.setupHistoryTabs();
       this.updateHeader();
       await this.refreshDashboard();
@@ -103,6 +107,9 @@ class MisGastosApp {
       this.resetIncomeForm();
     } else if (viewName === 'payments') {
       await this.refreshPayments();
+    } else if (viewName === 'ccpayments') {
+      this.resetCCForm();
+      await this.refreshCCPayments();
     } else if (viewName === 'settings') {
       await this.loadSettings();
     }
@@ -927,6 +934,270 @@ class MisGastosApp {
         if (payment) this.openPaymentModal(payment);
       });
     });
+  }
+
+  // ---- Pagos de Tarjeta de Crédito ----
+
+  setupCCPayments() {
+    const amountInput = document.getElementById('cc-amount');
+    amountInput.addEventListener('input', () => {
+      amountInput.value = Utils.formatAmountInput(amountInput.value);
+    });
+
+    document.getElementById('cc-date').value = Utils.today();
+    this.renderBankGrid();
+
+    document.getElementById('save-cc-payment').addEventListener('click', () => this.saveCCPayment());
+  }
+
+  renderBankGrid() {
+    const grid = document.getElementById('bank-grid');
+    if (!grid) return;
+    grid.innerHTML = DEFAULT_BANKS.map(bank => `
+      <button class="bank-btn" data-id="${bank.id}" type="button">
+        <span class="bank-btn-icon" style="color:${bank.color}">${bank.icon}</span>
+        <span class="bank-btn-label">${bank.name}</span>
+      </button>
+    `).join('');
+
+    grid.querySelectorAll('.bank-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        grid.querySelectorAll('.bank-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this.selectedBank = btn.dataset.id;
+      });
+    });
+  }
+
+  async saveCCPayment() {
+    const amount = Utils.parseCurrency(document.getElementById('cc-amount').value);
+    const description = document.getElementById('cc-description').value.trim();
+    const date = document.getElementById('cc-date').value;
+    const bank = this.selectedBank;
+
+    if (!amount || amount <= 0) { Utils.showToast('Ingresa un monto válido', 'error'); return; }
+    if (!bank) { Utils.showToast('Selecciona un banco', 'error'); return; }
+
+    try {
+      await this.db.addCCPayment({ amount, description: description || 'Pago tarjeta', date, bank });
+      const btn = document.getElementById('save-cc-payment');
+      btn.classList.add('saved');
+      const bankName = DEFAULT_BANKS.find(b => b.id === bank)?.name || bank;
+      Utils.showToast(`Pago ${bankName} — ${Utils.formatCurrency(amount)} registrado ✓`);
+      setTimeout(() => {
+        btn.classList.remove('saved');
+        this.resetCCForm();
+        this.refreshCCPayments();
+      }, 600);
+    } catch (err) {
+      console.error('Error guardando pago CC:', err);
+      Utils.showToast('Error al guardar', 'error');
+    }
+  }
+
+  resetCCForm() {
+    document.getElementById('cc-amount').value = '';
+    document.getElementById('cc-description').value = '';
+    document.getElementById('cc-date').value = Utils.today();
+    document.querySelectorAll('#bank-grid .bank-btn').forEach(b => b.classList.remove('selected'));
+    this.selectedBank = null;
+  }
+
+  async refreshCCPayments() {
+    const monthKey = Utils.currentMonthKey();
+    const stats = await this.db.getCCPaymentStats(monthKey);
+    const allPayments = await this.db.getAllCCPayments();
+
+    // Summary card
+    const summaryCard = document.getElementById('cc-summary-card');
+    const summaryContent = document.getElementById('cc-summary-content');
+
+    if (stats.count > 0) {
+      summaryCard.style.display = '';
+      let summaryHTML = `
+        <div class="cc-total-row">
+          <span class="cc-total-label">Total pagado este mes</span>
+          <span class="cc-total-amount">${Utils.formatCurrency(stats.total)}</span>
+        </div>
+      `;
+      // By bank breakdown
+      const bankEntries = Object.entries(stats.byBank).sort((a, b) => b[1] - a[1]);
+      if (bankEntries.length > 0) {
+        summaryHTML += '<div class="cc-bank-breakdown">';
+        bankEntries.forEach(([bankId, amount]) => {
+          const bank = DEFAULT_BANKS.find(b => b.id === bankId) || DEFAULT_BANKS[DEFAULT_BANKS.length - 1];
+          const pct = Math.round((amount / stats.total) * 100);
+          summaryHTML += `
+            <div class="cc-bank-row">
+              <div class="cc-bank-info">
+                <span class="cc-bank-icon" style="background:${bank.color}20;color:${bank.color}">${bank.icon}</span>
+                <span class="cc-bank-name">${bank.name}</span>
+              </div>
+              <div class="cc-bank-right">
+                <span class="cc-bank-amount">${Utils.formatCurrency(amount)}</span>
+                <span class="cc-bank-pct">${pct}%</span>
+              </div>
+            </div>
+          `;
+        });
+        summaryHTML += '</div>';
+      }
+      summaryContent.innerHTML = summaryHTML;
+    } else {
+      summaryCard.style.display = 'none';
+    }
+
+    // Payments list
+    const container = document.getElementById('cc-payments-list');
+    if (!allPayments.length) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">💳</div>
+          <div class="empty-state-text">No hay pagos de tarjeta registrados<br>¡Registra tu primer pago!</div>
+        </div>
+      `;
+      return;
+    }
+
+    // Sort by date desc
+    allPayments.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.id - a.id;
+    });
+
+    // Group by date
+    const groups = {};
+    allPayments.forEach(p => {
+      if (!groups[p.date]) groups[p.date] = [];
+      groups[p.date].push(p);
+    });
+
+    let html = '';
+    Object.entries(groups).forEach(([date, items], idx) => {
+      const dayTotal = items.reduce((s, p) => s + p.amount, 0);
+      html += `
+        <div class="date-group animate-in" style="animation-delay:${idx * 0.04}s">
+          <div class="date-group-header">
+            <span class="date-group-label">${Utils.relativeDate(date)}</span>
+            <span class="date-group-total">${Utils.formatCurrency(dayTotal)}</span>
+          </div>
+      `;
+      items.forEach(payment => {
+        const bank = DEFAULT_BANKS.find(b => b.id === payment.bank) || DEFAULT_BANKS[DEFAULT_BANKS.length - 1];
+        html += `
+          <div class="expense-item cc-payment-item" data-id="${payment.id}">
+            <div class="expense-icon" style="background:${bank.color}20;color:${bank.color}">
+              ${bank.icon}
+            </div>
+            <div class="expense-info">
+              <div class="expense-description">${payment.description || 'Pago tarjeta'}</div>
+              <div class="expense-meta">
+                <span>${bank.name}</span>
+              </div>
+            </div>
+            <div class="expense-amount" style="color:var(--danger)">${Utils.formatCurrency(payment.amount)}</div>
+          </div>
+        `;
+      });
+      html += '</div>';
+    });
+
+    container.innerHTML = html;
+
+    // Tap to edit
+    container.querySelectorAll('.cc-payment-item').forEach(item => {
+      item.addEventListener('click', () => {
+        this.openEditCCModal(Number(item.dataset.id));
+      });
+    });
+  }
+
+  // ---- Edit CC Payment Modal ----
+
+  setupEditCCModal() {
+    const overlay = document.getElementById('edit-cc-modal');
+    if (!overlay) return;
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeEditCCModal();
+    });
+
+    document.getElementById('edit-cc-cancel').addEventListener('click', () => this.closeEditCCModal());
+    document.getElementById('edit-cc-save').addEventListener('click', () => this.saveEditCC());
+    document.getElementById('edit-cc-delete').addEventListener('click', () => this.deleteFromEditCC());
+
+    const amountInput = document.getElementById('edit-cc-amount');
+    amountInput.addEventListener('input', () => {
+      amountInput.value = Utils.formatAmountInput(amountInput.value);
+    });
+  }
+
+  async openEditCCModal(id) {
+    const payment = await this.db.getCCPayment(id);
+    if (!payment) return;
+
+    this.editingCCPayment = payment;
+
+    document.getElementById('edit-cc-amount').value = Utils.formatAmountInput(payment.amount.toString());
+    document.getElementById('edit-cc-description').value = payment.description || '';
+    document.getElementById('edit-cc-date').value = payment.date;
+
+    const bankSelect = document.getElementById('edit-cc-bank');
+    bankSelect.innerHTML = DEFAULT_BANKS.map(b =>
+      `<option value="${b.id}" ${b.id === payment.bank ? 'selected' : ''}>${b.icon} ${b.name}</option>`
+    ).join('');
+
+    document.getElementById('edit-cc-modal').classList.add('active');
+  }
+
+  closeEditCCModal() {
+    document.getElementById('edit-cc-modal').classList.remove('active');
+    this.editingCCPayment = null;
+  }
+
+  async saveEditCC() {
+    if (!this.editingCCPayment) return;
+
+    const amount = Utils.parseCurrency(document.getElementById('edit-cc-amount').value);
+    const description = document.getElementById('edit-cc-description').value.trim();
+    const date = document.getElementById('edit-cc-date').value;
+    const bank = document.getElementById('edit-cc-bank').value;
+
+    if (!amount) { Utils.showToast('Ingresa un monto válido', 'error'); return; }
+
+    try {
+      const updated = {
+        ...this.editingCCPayment,
+        amount,
+        description: description || 'Pago tarjeta',
+        date,
+        bank,
+        month: Utils.monthKeyFromDate(date)
+      };
+
+      await this.db.updateCCPayment(updated);
+      this.closeEditCCModal();
+      Utils.showToast('Pago actualizado ✓');
+      await this.refreshCCPayments();
+    } catch (err) {
+      console.error('Error actualizando pago CC:', err);
+      Utils.showToast('Error al actualizar', 'error');
+    }
+  }
+
+  async deleteFromEditCC() {
+    if (!this.editingCCPayment) return;
+
+    this.showConfirm(
+      '¿Eliminar pago?',
+      `${this.editingCCPayment.description || 'Pago tarjeta'} — ${Utils.formatCurrency(this.editingCCPayment.amount)}`,
+      async () => {
+        await this.db.deleteCCPayment(this.editingCCPayment.id);
+        this.closeEditCCModal();
+        Utils.showToast('Pago eliminado');
+        await this.refreshCCPayments();
+      }
+    );
   }
 
   // ---- Theme ----
