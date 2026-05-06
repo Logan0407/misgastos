@@ -165,27 +165,6 @@ class MisGastosApp {
     document.getElementById('today-total').textContent = Utils.formatCurrency(await this.db.getTodayTotal());
     document.getElementById('week-total').textContent = Utils.formatCurrency(await this.db.getWeekTotal());
 
-    // Budget bar
-    const budgetBar = document.getElementById('budget-bar');
-    const budgetFill = document.getElementById('budget-fill');
-    const budgetLabel = document.getElementById('budget-label');
-
-    if (stats.budget) {
-      budgetBar.classList.add('visible');
-      const pct = Math.min((stats.total / stats.budget) * 100, 100);
-      budgetFill.style.width = pct + '%';
-      budgetFill.classList.remove('warning', 'danger');
-      if (pct >= 90) budgetFill.classList.add('danger');
-      else if (pct >= 70) budgetFill.classList.add('warning');
-      const remaining = stats.budget - stats.total;
-      budgetLabel.textContent = remaining > 0
-        ? `Quedan ${Utils.formatCurrency(remaining)} de ${Utils.formatCurrency(stats.budget)}`
-        : `¡Presupuesto excedido por ${Utils.formatCurrency(Math.abs(remaining))}!`;
-    } else {
-      budgetBar.classList.remove('visible');
-      budgetLabel.textContent = '';
-    }
-
     // Payments summary
     await this.renderPaymentsSummary(monthKey);
 
