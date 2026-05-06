@@ -14,6 +14,7 @@ class MisGastosApp {
     this.editingIncome = null;
     this.editingPayment = null;
     this.editingCCPayment = null;
+    this.editingUserCard = null;
     this.selectedBank = null;
     this.selectedCCSource = null;
     this.swipedItem = null;
@@ -37,6 +38,7 @@ class MisGastosApp {
       this.setupEditIncomeModal();
       this.setupCCPayments();
       this.setupEditCCModal();
+      this.setupUserCards();
       this.setupHistoryTabs();
       this.updateHeader();
       await this.refreshDashboard();
@@ -135,9 +137,26 @@ class MisGastosApp {
     // CC Payments total in balance card
     const ccRow = document.getElementById('cc-balance-row');
     const ccTotalEl = document.getElementById('month-cc-total');
-    if (stats.totalCCPayments > 0) {
+    const debitRecurringEl = document.getElementById('month-debit-recurring');
+    const debitRecurringDetail = document.getElementById('debit-recurring-detail');
+    const ccDivider = document.getElementById('cc-divider');
+
+    const hasCC = stats.totalCCPayments > 0;
+    const hasDebit = stats.totalDebitRecurring > 0;
+
+    if (hasCC || hasDebit) {
       ccRow.style.display = '';
       ccTotalEl.textContent = Utils.formatCurrency(stats.totalCCPayments);
+      document.querySelector('.cc-detail').style.display = hasCC ? '' : 'none';
+
+      if (hasDebit) {
+        debitRecurringDetail.style.display = '';
+        debitRecurringEl.textContent = Utils.formatCurrency(stats.totalDebitRecurring);
+        ccDivider.style.display = hasCC ? '' : 'none';
+      } else {
+        debitRecurringDetail.style.display = 'none';
+        ccDivider.style.display = 'none';
+      }
     } else {
       ccRow.style.display = 'none';
     }
@@ -826,6 +845,17 @@ class MisGastosApp {
     this.renderPaymentTypeGrid();
     document.getElementById('payment-cancel').addEventListener('click', () => this.closePaymentModal());
     document.getElementById('payment-save').addEventListener('click', () => this.savePayment());
+
+    // Payment method toggle
+    document.querySelectorAll('#payment-method-toggle .pm-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#payment-method-toggle .pm-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const method = btn.dataset.method;
+        const cardContainer = document.getElementById('payment-card-select-container');
+        cardContainer.style.display = method === 'credito' ? '' : 'none';
+      });
+    });
   }
 
   renderPaymentTypeGrid() {
@@ -845,7 +875,7 @@ class MisGastosApp {
     });
   }
 
-  openPaymentModal(payment = null) {
+  async openPaymentModal(payment = null) {
     this.editingPayment = payment;
     const modal = document.getElementById('add-payment-modal');
     const title = document.getElementById('payment-modal-title');
@@ -858,6 +888,24 @@ class MisGastosApp {
       const btn = document.querySelector(`#payment-type-grid [data-id="${payment.type}"]`);
       if (btn) btn.classList.add('selected');
     }
+
+    // Payment method
+    const method = payment ? (payment.paymentMethod || 'debito') : 'debito';
+    document.querySelectorAll('#payment-method-toggle .pm-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.method === method);
+    });
+    const cardContainer = document.getElementById('payment-card-select-container');
+    cardContainer.style.display = method === 'credito' ? '' : 'none';
+
+    // Populate card select
+    const cards = await this.db.getAllUserCards();
+    const cardSelect = document.getElementById('payment-card-select');
+    cardSelect.innerHTML = '<option value="">Selecciona tarjeta...</option>' +
+      cards.map(c => {
+        const bank = DEFAULT_BANKS.find(b => b.id === c.bank) || { name: c.bank };
+        return `<option value="${c.id}" ${payment && payment.creditCardId === c.id ? 'selected' : ''}>${c.name} (${bank.name})</option>`;
+      }).join('');
+
     modal.classList.add('active');
   }
 
@@ -872,16 +920,21 @@ class MisGastosApp {
     const dueDay = parseInt(document.getElementById('payment-due-day').value) || 0;
     const selectedType = document.querySelector('#payment-type-grid .category-btn.selected');
     const type = selectedType ? selectedType.dataset.id : null;
+    const activeMethod = document.querySelector('#payment-method-toggle .pm-btn.active');
+    const paymentMethod = activeMethod ? activeMethod.dataset.method : 'debito';
+    const creditCardId = paymentMethod === 'credito' ? Number(document.getElementById('payment-card-select').value) : null;
+
     if (!name) { Utils.showToast('Ingresa un nombre', 'error'); return; }
     if (!amount) { Utils.showToast('Ingresa un monto', 'error'); return; }
     if (dueDay < 1 || dueDay > 31) { Utils.showToast('Día inválido (1-31)', 'error'); return; }
     if (!type) { Utils.showToast('Selecciona un tipo', 'error'); return; }
+    if (paymentMethod === 'credito' && !creditCardId) { Utils.showToast('Selecciona una tarjeta', 'error'); return; }
     try {
       if (this.editingPayment) {
-        await this.db.updateRecurringPayment({ ...this.editingPayment, name, amount, dueDay, type });
+        await this.db.updateRecurringPayment({ ...this.editingPayment, name, amount, dueDay, type, paymentMethod, creditCardId });
         Utils.showToast('Pago actualizado ✓');
       } else {
-        await this.db.addRecurringPayment({ name, amount, dueDay, type });
+        await this.db.addRecurringPayment({ name, amount, dueDay, type, paymentMethod, creditCardId });
         Utils.showToast('Pago agregado ✓');
       }
       this.closePaymentModal();
@@ -894,6 +947,7 @@ class MisGastosApp {
     const monthKey = Utils.currentMonthKey();
     const statuses = await this.db.getMonthPaymentStatuses(monthKey);
     const container = document.getElementById('recurring-payments-list');
+    const userCards = await this.db.getAllUserCards();
     const paid = payments.filter(p => statuses[p.id]).length;
     const pct = payments.length ? (paid / payments.length) * 100 : 0;
     document.getElementById('payments-progress-text').textContent = `${paid} de ${payments.length} pagados`;
@@ -906,12 +960,18 @@ class MisGastosApp {
     container.innerHTML = payments.map(p => {
       const isPaid = statuses[p.id] || false;
       const type = DEFAULT_RECURRING_TYPES.find(t => t.id === p.type) || DEFAULT_RECURRING_TYPES[7];
+      const method = p.paymentMethod || 'debito';
+      let methodLabel = '💳 Débito';
+      if (method === 'credito') {
+        const card = userCards.find(c => c.id === p.creditCardId);
+        methodLabel = card ? `💳 ${card.name}` : '💳 Crédito';
+      }
       return `
         <div class="recurring-item ${isPaid ? 'paid' : ''}" data-id="${p.id}">
           <div class="recurring-icon" style="background:${type.color}20;color:${type.color}">${type.icon}</div>
           <div class="recurring-info">
             <div class="recurring-name">${p.name}</div>
-            <div class="recurring-meta">Vence día ${p.dueDay} · ${type.name}</div>
+            <div class="recurring-meta">Vence día ${p.dueDay} · ${type.name} · ${methodLabel}</div>
           </div>
           <div class="recurring-amount">${Utils.formatCurrency(p.amount)}</div>
           <button class="recurring-delete-btn" data-id="${p.id}">🗑️</button>
@@ -922,7 +982,19 @@ class MisGastosApp {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = Number(btn.dataset.id);
+        const payment = await this.db.getRecurringPayment(id);
         await this.db.togglePaymentStatus(id, monthKey);
+        // If credit card and toggling to paid, adjust card balance
+        if (payment && payment.paymentMethod === 'credito' && payment.creditCardId) {
+          const wasPaid = statuses[id] || false;
+          if (!wasPaid) {
+            // Marking as paid: deduct from card
+            await this.db.adjustCardBalance(payment.creditCardId, -payment.amount);
+          } else {
+            // Unmarking: restore card balance
+            await this.db.adjustCardBalance(payment.creditCardId, payment.amount);
+          }
+        }
         await this.refreshPayments();
       });
     });
@@ -947,6 +1019,140 @@ class MisGastosApp {
     });
   }
 
+  // ---- Gestión de Tarjetas del Usuario ----
+
+  setupUserCards() {
+    document.getElementById('btn-add-card').addEventListener('click', () => this.openCardModal());
+    document.getElementById('card-cancel').addEventListener('click', () => this.closeCardModal());
+    document.getElementById('card-save').addEventListener('click', () => this.saveUserCard());
+
+    const limitInput = document.getElementById('card-limit');
+    limitInput.addEventListener('input', () => {
+      limitInput.value = Utils.formatAmountInput(limitInput.value);
+    });
+
+    // Populate bank select
+    const bankSelect = document.getElementById('card-bank');
+    bankSelect.innerHTML = DEFAULT_BANKS.map(b =>
+      `<option value="${b.id}">${b.icon} ${b.name}</option>`
+    ).join('');
+  }
+
+  openCardModal(card = null) {
+    this.editingUserCard = card;
+    document.getElementById('card-modal-title').textContent = card ? 'Editar Tarjeta' : 'Agregar Tarjeta';
+    document.getElementById('card-name').value = card ? card.name : '';
+    document.getElementById('card-bank').value = card ? card.bank : DEFAULT_BANKS[0].id;
+    document.getElementById('card-limit').value = card ? Utils.formatAmountInput(card.creditLimit.toString()) : '';
+    document.getElementById('add-card-modal').classList.add('active');
+  }
+
+  closeCardModal() {
+    document.getElementById('add-card-modal').classList.remove('active');
+    this.editingUserCard = null;
+  }
+
+  async saveUserCard() {
+    const name = document.getElementById('card-name').value.trim();
+    const bank = document.getElementById('card-bank').value;
+    const creditLimit = Utils.parseCurrency(document.getElementById('card-limit').value);
+
+    if (!name) { Utils.showToast('Ingresa un nombre', 'error'); return; }
+    if (!creditLimit || creditLimit <= 0) { Utils.showToast('Ingresa un cupo válido', 'error'); return; }
+
+    try {
+      if (this.editingUserCard) {
+        await this.db.updateUserCard({ ...this.editingUserCard, name, bank, creditLimit });
+        Utils.showToast('Tarjeta actualizada ✓');
+      } else {
+        await this.db.addUserCard({ name, bank, creditLimit, usedAmount: 0 });
+        Utils.showToast('Tarjeta agregada ✓');
+      }
+      this.closeCardModal();
+      await this.refreshCCPayments();
+    } catch (err) {
+      console.error('Error guardando tarjeta:', err);
+      Utils.showToast('Error al guardar', 'error');
+    }
+  }
+
+  async renderUserCards() {
+    const cards = await this.db.getAllUserCards();
+    const container = document.getElementById('user-cards-list');
+
+    if (!cards.length) {
+      container.innerHTML = '<div style="font-size:0.85rem;color:var(--text-muted);text-align:center;padding:12px 0">No tienes tarjetas aún</div>';
+      return;
+    }
+
+    container.innerHTML = cards.map(card => {
+      const bank = DEFAULT_BANKS.find(b => b.id === card.bank) || DEFAULT_BANKS[DEFAULT_BANKS.length - 1];
+      const used = card.usedAmount || 0;
+      const available = card.creditLimit - used;
+      const usedPct = Math.min(Math.round((used / card.creditLimit) * 100), 100);
+      let barClass = '';
+      if (usedPct >= 90) barClass = 'danger';
+      else if (usedPct >= 70) barClass = 'warning';
+
+      return `
+        <div class="user-card-item" data-id="${card.id}">
+          <div class="user-card-top">
+            <div class="user-card-info">
+              <span class="user-card-icon" style="background:${bank.color}20;color:${bank.color}">${bank.icon}</span>
+              <div>
+                <div class="user-card-name">${card.name}</div>
+                <div class="user-card-bank">${bank.name}</div>
+              </div>
+            </div>
+            <button class="user-card-delete" data-id="${card.id}">🗑️</button>
+          </div>
+          <div class="user-card-amounts">
+            <div><span class="user-card-label">Disponible</span><span class="user-card-available">${Utils.formatCurrency(available)}</span></div>
+            <div><span class="user-card-label">Cupo</span><span class="user-card-limit">${Utils.formatCurrency(card.creditLimit)}</span></div>
+          </div>
+          <div class="user-card-bar">
+            <div class="user-card-bar-fill ${barClass}" style="width:${usedPct}%"></div>
+          </div>
+          <div class="user-card-pct">${usedPct}% usado</div>
+        </div>
+      `;
+    }).join('');
+
+    // Edit on click
+    container.querySelectorAll('.user-card-item').forEach(item => {
+      item.addEventListener('click', async (e) => {
+        if (e.target.closest('.user-card-delete')) return;
+        const card = await this.db.getUserCard(Number(item.dataset.id));
+        if (card) this.openCardModal(card);
+      });
+    });
+
+    // Delete
+    container.querySelectorAll('.user-card-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = Number(btn.dataset.id);
+        this.showConfirm('¿Eliminar tarjeta?', 'Se eliminará esta tarjeta y sus datos.', async () => {
+          await this.db.deleteUserCard(id);
+          Utils.showToast('Tarjeta eliminada');
+          await this.refreshCCPayments();
+        });
+      });
+    });
+  }
+
+  async populateCardSelects() {
+    const cards = await this.db.getAllUserCards();
+    const ccSelect = document.getElementById('cc-card-select');
+    if (ccSelect) {
+      ccSelect.innerHTML = '<option value="">Selecciona tarjeta...</option>' +
+        cards.map(c => {
+          const bank = DEFAULT_BANKS.find(b => b.id === c.bank) || { name: c.bank };
+          return `<option value="${c.id}">${c.name} (${bank.name})</option>`;
+        }).join('');
+    }
+  }
+
   // ---- Pagos de Tarjeta de Crédito ----
 
   setupCCPayments() {
@@ -960,6 +1166,12 @@ class MisGastosApp {
     this.renderBankGrid();
 
     document.getElementById('save-cc-payment').addEventListener('click', () => this.saveCCPayment());
+  }
+
+  async refreshCCPayments() {
+    await this.renderUserCards();
+    await this.populateCardSelects();
+    await this._refreshCCPaymentsList();
   }
 
   renderCCSourceGrid() {
@@ -1011,8 +1223,14 @@ class MisGastosApp {
     if (!source) { Utils.showToast('Selecciona de dónde sale el pago', 'error'); return; }
     if (!bank) { Utils.showToast('Selecciona un banco', 'error'); return; }
 
+    const cardId = Number(document.getElementById('cc-card-select').value) || null;
+
     try {
-      await this.db.addCCPayment({ amount, description: description || 'Pago tarjeta', date, bank, source });
+      await this.db.addCCPayment({ amount, description: description || 'Pago tarjeta', date, bank, source, cardId });
+      // If a card was selected, restore cupo
+      if (cardId) {
+        await this.db.adjustCardBalance(cardId, amount);
+      }
       const btn = document.getElementById('save-cc-payment');
       btn.classList.add('saved');
       const bankName = DEFAULT_BANKS.find(b => b.id === bank)?.name || bank;
@@ -1036,9 +1254,12 @@ class MisGastosApp {
     document.querySelectorAll('#cc-source-grid .cc-source-btn').forEach(b => b.classList.remove('selected'));
     this.selectedBank = null;
     this.selectedCCSource = null;
+    // Reset card select
+    const ccCardSelect = document.getElementById('cc-card-select');
+    if (ccCardSelect) ccCardSelect.value = '';
   }
 
-  async refreshCCPayments() {
+  async _refreshCCPaymentsList() {
     const monthKey = Utils.currentMonthKey();
     const stats = await this.db.getCCPaymentStats(monthKey);
     const allPayments = await this.db.getAllCCPayments();

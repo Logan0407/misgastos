@@ -3,7 +3,7 @@
 // ============================================
 
 const DB_NAME = 'MisGastosDB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 class GastosDB {
   constructor() {
@@ -72,6 +72,12 @@ class GastosDB {
           ccStore.createIndex('date', 'date', { unique: false });
           ccStore.createIndex('month', 'month', { unique: false });
           ccStore.createIndex('bank', 'bank', { unique: false });
+        }
+
+        // v5: Store de tarjetas del usuario
+        if (!db.objectStoreNames.contains('user_cards')) {
+          const cardsStore = db.createObjectStore('user_cards', { keyPath: 'id', autoIncrement: true });
+          cardsStore.createIndex('bank', 'bank', { unique: false });
         }
       };
 
@@ -212,6 +218,48 @@ class GastosDB {
     });
 
     return { total, byCategory, count: incomes.length, incomes };
+  }
+
+  // ---- Tarjetas del Usuario ----
+
+  async addUserCard(card) {
+    const store = this._transaction('user_cards', 'readwrite');
+    const data = {
+      ...card,
+      createdAt: new Date().toISOString()
+    };
+    return this._promisify(store.add(data));
+  }
+
+  async updateUserCard(card) {
+    const store = this._transaction('user_cards', 'readwrite');
+    return this._promisify(store.put(card));
+  }
+
+  async deleteUserCard(id) {
+    const store = this._transaction('user_cards', 'readwrite');
+    return this._promisify(store.delete(id));
+  }
+
+  async getUserCard(id) {
+    const store = this._transaction('user_cards');
+    return this._promisify(store.get(id));
+  }
+
+  async getAllUserCards() {
+    const store = this._transaction('user_cards');
+    return this._promisify(store.getAll());
+  }
+
+  async adjustCardBalance(cardId, amount) {
+    // amount positive = increase available (payment made TO card)
+    // amount negative = decrease available (purchase made WITH card)
+    const card = await this.getUserCard(cardId);
+    if (!card) return;
+    card.usedAmount = (card.usedAmount || 0) - amount;
+    if (card.usedAmount < 0) card.usedAmount = 0;
+    const writeStore = this._transaction('user_cards', 'readwrite');
+    return this._promisify(writeStore.put(card));
   }
 
   // ---- Pagos Recurrentes ----
@@ -373,6 +421,16 @@ class GastosDB {
     const incomeStats = await this.getIncomeStats(monthKey);
     const ccStats = await this.getCCPaymentStats(monthKey);
 
+    // Calcular pagos recurrentes pagados con débito
+    const payments = await this.getAllRecurringPayments();
+    const statuses = await this.getMonthPaymentStatuses(monthKey);
+    let totalDebitRecurring = 0;
+    payments.forEach(p => {
+      if (statuses[p.id] && (p.paymentMethod || 'debito') === 'debito') {
+        totalDebitRecurring += p.amount;
+      }
+    });
+
     const total = expenses.reduce((sum, e) => sum + e.amount, 0);
 
     // Por categoría
@@ -407,7 +465,8 @@ class GastosDB {
       total,
       totalIncome: incomeStats.total,
       totalCCPayments: ccStats.total,
-      balance: incomeStats.total - total - ccStats.total,
+      totalDebitRecurring,
+      balance: incomeStats.total - total - ccStats.total - totalDebitRecurring,
       budget: budget ? budget.amount : null,
       byCategory,
       byPaymentSource,
@@ -438,7 +497,7 @@ class GastosDB {
   }
 
   async clearAll() {
-    const storeNames = ['expenses', 'budgets', 'settings', 'income', 'recurring_payments', 'payment_status', 'cc_payments'];
+    const storeNames = ['expenses', 'budgets', 'settings', 'income', 'recurring_payments', 'payment_status', 'cc_payments', 'user_cards'];
     const tx = this.db.transaction(storeNames, 'readwrite');
     storeNames.forEach(name => tx.objectStore(name).clear());
     return new Promise((resolve, reject) => {

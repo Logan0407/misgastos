@@ -60,6 +60,14 @@
                 <span class="balance-detail-amount" id="month-cc-total">$0</span>
               </div>
             </div>
+            <div class="balance-divider" id="cc-divider" style="display:none;"></div>
+            <div class="balance-detail debit-recurring-detail" id="debit-recurring-detail" style="display:none;">
+              <span class="balance-detail-icon">📝</span>
+              <div>
+                <span class="balance-detail-label">Pagos Débito</span>
+                <span class="balance-detail-amount" id="month-debit-recurring">$0</span>
+              </div>
+            </div>
           </div>
           <div class="budget-bar" id="budget-bar">
             <div class="budget-fill" id="budget-fill"></div>
@@ -168,8 +176,22 @@
     <!-- ── Pagos Tarjeta de Crédito ── -->
     <section id="view-ccpayments" class="view">
       <div class="cc-header">
-        <h2>💳 Pagos de Tarjeta</h2>
-        <p class="cc-subtitle">Registra los pagos a tus tarjetas de crédito</p>
+        <h2>💳 Tarjetas de Crédito</h2>
+      </div>
+
+      <!-- Mis Tarjetas -->
+      <div class="card mis-tarjetas-card animate-in">
+        <h3>🏦 Mis Tarjetas</h3>
+        <div id="user-cards-list"></div>
+        <button class="btn-add-card" id="btn-add-card">
+          <svg viewBox="0 0 24 24" width="18" height="18"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+          Agregar tarjeta
+        </button>
+      </div>
+
+      <div class="cc-header" style="padding-top:8px">
+        <h2 style="font-size:1rem">💸 Registrar Pago a Tarjeta</h2>
+        <p class="cc-subtitle">Paga la deuda de tus tarjetas</p>
       </div>
 
       <!-- Formulario rápido de pago -->
@@ -186,6 +208,11 @@
 
         <label class="form-label">🏦 Banco</label>
         <div class="bank-grid" id="bank-grid"></div>
+
+        <label class="form-label">🏦 ¿A qué tarjeta?</label>
+        <select id="cc-card-select" class="cc-input">
+          <option value="">Selecciona tarjeta...</option>
+        </select>
 
         <input type="date" id="cc-date" class="cc-input">
 
@@ -384,6 +411,17 @@
         <input type="number" id="payment-due-day" min="1" max="31" placeholder="Día (1-31)" style="padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-card); border: 1px solid var(--border);">
         <div class="form-label" style="margin-bottom: -4px;">Tipo</div>
         <div class="category-grid payment-type-grid" id="payment-type-grid"></div>
+        <div class="form-label" style="margin-bottom: -4px;">💳 Medio de pago</div>
+        <div class="payment-method-toggle" id="payment-method-toggle">
+          <button class="pm-btn active" data-method="debito" type="button">💳 Débito</button>
+          <button class="pm-btn" data-method="credito" type="button">💳 Crédito</button>
+        </div>
+        <div id="payment-card-select-container" style="display:none;">
+          <div class="form-label" style="margin-bottom: -4px;">¿Con qué tarjeta?</div>
+          <select id="payment-card-select" style="padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-card); border: 1px solid var(--border); width: 100%; color: var(--text-primary); font-size: 0.95rem;">
+            <option value="">Selecciona tarjeta...</option>
+          </select>
+        </div>
         <div class="modal-actions">
           <button id="payment-cancel" class="btn-secondary">Cancelar</button>
           <button id="payment-save" class="btn-primary">Guardar</button>
@@ -420,6 +458,24 @@
       <div class="confirm-actions">
         <button class="confirm-cancel" id="confirm-cancel">Cancelar</button>
         <button class="confirm-ok" id="confirm-ok">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Add User Card Modal ===== -->
+  <div class="modal-overlay" id="add-card-modal">
+    <div class="modal-content">
+      <div class="modal-handle"></div>
+      <div class="modal-title" id="card-modal-title">Agregar Tarjeta</div>
+      <div class="modal-form">
+        <input type="text" id="card-name" placeholder="Nombre (ej: Visa Gold)" autocomplete="off">
+        <select id="card-bank" style="padding: 14px 16px; border-radius: var(--radius-sm); background: var(--bg-card); border: 1px solid var(--border); width: 100%; color: var(--text-primary); font-size: 0.95rem;"></select>
+        <div class="form-label" style="margin-bottom: -4px;">Cupo total</div>
+        <input type="text" id="card-limit" inputmode="numeric" placeholder="Ej: 2.000.000" autocomplete="off">
+        <div class="modal-actions">
+          <button id="card-cancel" class="btn-secondary">Cancelar</button>
+          <button id="card-save" class="btn-primary btn-cc">Guardar</button>
+        </div>
       </div>
     </div>
   </div>
