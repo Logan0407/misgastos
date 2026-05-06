@@ -1012,7 +1012,12 @@ class MisGastosApp {
 
     const availInput = document.getElementById('card-available');
     availInput.addEventListener('input', () => {
-      availInput.value = Utils.formatAmountInput(availInput.value);
+      let raw = availInput.value;
+      const isNegative = raw.startsWith('-');
+      const digits = raw.replace(/[^\d]/g, '');
+      if (!digits) { availInput.value = isNegative ? '-' : ''; return; }
+      const formatted = parseInt(digits, 10).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+      availInput.value = isNegative ? '-' + formatted : formatted;
     });
 
     // Populate bank select
@@ -1029,7 +1034,13 @@ class MisGastosApp {
     document.getElementById('card-bank').value = card ? card.bank : DEFAULT_BANKS[0].id;
     document.getElementById('card-limit').value = card ? Utils.formatAmountInput(card.creditLimit.toString()) : '';
     const avail = card ? card.availableBalance : '';
-    document.getElementById('card-available').value = card ? Utils.formatAmountInput(avail.toString()) : '';
+    if (card) {
+      const isNeg = avail < 0;
+      const absStr = Utils.formatAmountInput(Math.abs(avail).toString());
+      document.getElementById('card-available').value = isNeg ? '-' + absStr : absStr;
+    } else {
+      document.getElementById('card-available').value = '';
+    }
     document.getElementById('add-card-modal').classList.add('active');
   }
 
@@ -1042,11 +1053,12 @@ class MisGastosApp {
     const name = document.getElementById('card-name').value.trim();
     const bank = document.getElementById('card-bank').value;
     const creditLimit = Utils.parseCurrency(document.getElementById('card-limit').value);
-    const availableInput = Utils.parseCurrency(document.getElementById('card-available').value);
+    const availRaw = document.getElementById('card-available').value.trim();
+    const isNeg = availRaw.startsWith('-');
+    const availableInput = Utils.parseCurrency(availRaw) * (isNeg ? -1 : 1);
 
     if (!name) { Utils.showToast('Ingresa un nombre', 'error'); return; }
     if (!creditLimit || creditLimit <= 0) { Utils.showToast('Ingresa un cupo total válido', 'error'); return; }
-    if (availableInput === null || availableInput === undefined || availableInput < 0) { Utils.showToast('Ingresa un cupo disponible válido', 'error'); return; }
     if (availableInput > creditLimit) { Utils.showToast('El disponible no puede ser mayor al cupo total', 'error'); return; }
 
     try {
@@ -1078,10 +1090,12 @@ class MisGastosApp {
       const bank = DEFAULT_BANKS.find(b => b.id === card.bank) || DEFAULT_BANKS[DEFAULT_BANKS.length - 1];
       const available = card.availableBalance || 0;
       const used = card.creditLimit - available;
-      const usedPct = card.creditLimit > 0 ? Math.min(Math.round((used / card.creditLimit) * 100), 100) : 0;
+      const usedPct = card.creditLimit > 0 ? Math.min(Math.round((Math.max(used, 0) / card.creditLimit) * 100), 100) : 0;
       let barClass = '';
-      if (usedPct >= 90) barClass = 'danger';
+      if (available < 0) barClass = 'danger';
+      else if (usedPct >= 90) barClass = 'danger';
       else if (usedPct >= 70) barClass = 'warning';
+      const availColor = available < 0 ? '#ef4444' : '#22c55e';
 
       return `
         <div class="user-card-item" data-id="${card.id}">
@@ -1096,7 +1110,7 @@ class MisGastosApp {
             <button class="user-card-delete" data-id="${card.id}">🗑️</button>
           </div>
           <div class="user-card-amounts">
-            <div><span class="user-card-label">Cupo Disponible</span><span class="user-card-available">${Utils.formatCurrency(available)}</span></div>
+            <div><span class="user-card-label">Cupo Disponible</span><span class="user-card-available" style="color:${availColor}">${available < 0 ? '-' : ''}${Utils.formatCurrency(Math.abs(available))}</span></div>
             <div><span class="user-card-label">Cupo Total</span><span class="user-card-limit">${Utils.formatCurrency(card.creditLimit)}</span></div>
           </div>
           <div class="user-card-bar">

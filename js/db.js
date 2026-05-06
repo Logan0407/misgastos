@@ -257,7 +257,6 @@ class GastosDB {
     const card = await this.getUserCard(cardId);
     if (!card) return;
     card.availableBalance = (card.availableBalance || 0) + amount;
-    if (card.availableBalance < 0) card.availableBalance = 0;
     const writeStore = this._transaction('user_cards', 'readwrite');
     return this._promisify(writeStore.put(card));
   }
