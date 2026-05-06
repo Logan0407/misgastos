@@ -1053,9 +1053,7 @@ class MisGastosApp {
     const name = document.getElementById('card-name').value.trim();
     const bank = document.getElementById('card-bank').value;
     const creditLimit = Utils.parseCurrency(document.getElementById('card-limit').value);
-    const availRaw = document.getElementById('card-available').value.trim();
-    const isNeg = availRaw.startsWith('-');
-    const availableInput = Utils.parseCurrency(availRaw) * (isNeg ? -1 : 1);
+    const availableInput = Utils.parseCurrency(document.getElementById('card-available').value);
 
     if (!name) { Utils.showToast('Ingresa un nombre', 'error'); return; }
     if (!creditLimit || creditLimit <= 0) { Utils.showToast('Ingresa un cupo total válido', 'error'); return; }
@@ -1116,7 +1114,7 @@ class MisGastosApp {
           <div class="user-card-bar">
             <div class="user-card-bar-fill ${barClass}" style="width:${usedPct}%"></div>
           </div>
-          <div class="user-card-pct">${usedPct}% usado</div>
+          <div class="user-card-pct">${available < 0 ? '<span style="color:#ef4444;font-weight:600">⚠️ Tarjeta con sobregiro</span>' : usedPct + '% usado'}</div>
         </div>
       `;
     }).join('');
