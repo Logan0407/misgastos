@@ -1107,8 +1107,8 @@ class MisGastosApp {
             <button class="user-card-delete" data-id="${card.id}">🗑️</button>
           </div>
           <div class="user-card-amounts">
-            <div><span class="user-card-label">Disponible</span><span class="user-card-available">${Utils.formatCurrency(available)}</span></div>
-            <div><span class="user-card-label">Cupo</span><span class="user-card-limit">${Utils.formatCurrency(card.creditLimit)}</span></div>
+            <div><span class="user-card-label">Cupo Disponible</span><span class="user-card-available">${Utils.formatCurrency(available)}</span></div>
+            <div><span class="user-card-label">Cupo Total</span><span class="user-card-limit">${Utils.formatCurrency(card.creditLimit)}</span></div>
           </div>
           <div class="user-card-bar">
             <div class="user-card-bar-fill ${barClass}" style="width:${usedPct}%"></div>
