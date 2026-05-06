@@ -1049,7 +1049,7 @@ class MisGastosApp {
     document.getElementById('card-name').value = card ? card.name : '';
     document.getElementById('card-bank').value = card ? card.bank : DEFAULT_BANKS[0].id;
     document.getElementById('card-limit').value = card ? Utils.formatAmountInput(card.creditLimit.toString()) : '';
-    const avail = card ? (card.creditLimit - (card.usedAmount || 0)) : '';
+    const avail = card ? card.availableBalance : '';
     document.getElementById('card-available').value = card ? Utils.formatAmountInput(avail.toString()) : '';
     document.getElementById('add-card-modal').classList.add('active');
   }
@@ -1070,14 +1070,12 @@ class MisGastosApp {
     if (availableInput === null || availableInput === undefined || availableInput < 0) { Utils.showToast('Ingresa un cupo disponible válido', 'error'); return; }
     if (availableInput > creditLimit) { Utils.showToast('El disponible no puede ser mayor al cupo total', 'error'); return; }
 
-    const usedAmount = creditLimit - availableInput;
-
     try {
       if (this.editingUserCard) {
-        await this.db.updateUserCard({ ...this.editingUserCard, name, bank, creditLimit, usedAmount });
+        await this.db.updateUserCard({ ...this.editingUserCard, name, bank, creditLimit, availableBalance: availableInput });
         Utils.showToast('Tarjeta actualizada ✓');
       } else {
-        await this.db.addUserCard({ name, bank, creditLimit, usedAmount });
+        await this.db.addUserCard({ name, bank, creditLimit, availableBalance: availableInput });
         Utils.showToast('Tarjeta agregada ✓');
       }
       this.closeCardModal();
@@ -1099,9 +1097,9 @@ class MisGastosApp {
 
     container.innerHTML = cards.map(card => {
       const bank = DEFAULT_BANKS.find(b => b.id === card.bank) || DEFAULT_BANKS[DEFAULT_BANKS.length - 1];
-      const used = card.usedAmount || 0;
-      const available = card.creditLimit - used;
-      const usedPct = Math.min(Math.round((used / card.creditLimit) * 100), 100);
+      const available = card.availableBalance || 0;
+      const used = card.creditLimit - available;
+      const usedPct = card.creditLimit > 0 ? Math.min(Math.round((used / card.creditLimit) * 100), 100) : 0;
       let barClass = '';
       if (usedPct >= 90) barClass = 'danger';
       else if (usedPct >= 70) barClass = 'warning';

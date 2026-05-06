@@ -256,8 +256,8 @@ class GastosDB {
     // amount negative = decrease available (purchase made WITH card)
     const card = await this.getUserCard(cardId);
     if (!card) return;
-    card.usedAmount = (card.usedAmount || 0) - amount;
-    if (card.usedAmount < 0) card.usedAmount = 0;
+    card.availableBalance = (card.availableBalance || 0) + amount;
+    if (card.availableBalance < 0) card.availableBalance = 0;
     const writeStore = this._transaction('user_cards', 'readwrite');
     return this._promisify(writeStore.put(card));
   }
