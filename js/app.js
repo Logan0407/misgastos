@@ -1031,6 +1031,11 @@ class MisGastosApp {
       limitInput.value = Utils.formatAmountInput(limitInput.value);
     });
 
+    const availInput = document.getElementById('card-available');
+    availInput.addEventListener('input', () => {
+      availInput.value = Utils.formatAmountInput(availInput.value);
+    });
+
     // Populate bank select
     const bankSelect = document.getElementById('card-bank');
     bankSelect.innerHTML = DEFAULT_BANKS.map(b =>
@@ -1044,6 +1049,8 @@ class MisGastosApp {
     document.getElementById('card-name').value = card ? card.name : '';
     document.getElementById('card-bank').value = card ? card.bank : DEFAULT_BANKS[0].id;
     document.getElementById('card-limit').value = card ? Utils.formatAmountInput(card.creditLimit.toString()) : '';
+    const avail = card ? (card.creditLimit - (card.usedAmount || 0)) : '';
+    document.getElementById('card-available').value = card ? Utils.formatAmountInput(avail.toString()) : '';
     document.getElementById('add-card-modal').classList.add('active');
   }
 
@@ -1056,16 +1063,21 @@ class MisGastosApp {
     const name = document.getElementById('card-name').value.trim();
     const bank = document.getElementById('card-bank').value;
     const creditLimit = Utils.parseCurrency(document.getElementById('card-limit').value);
+    const availableInput = Utils.parseCurrency(document.getElementById('card-available').value);
 
     if (!name) { Utils.showToast('Ingresa un nombre', 'error'); return; }
-    if (!creditLimit || creditLimit <= 0) { Utils.showToast('Ingresa un cupo válido', 'error'); return; }
+    if (!creditLimit || creditLimit <= 0) { Utils.showToast('Ingresa un cupo total válido', 'error'); return; }
+    if (availableInput === null || availableInput === undefined || availableInput < 0) { Utils.showToast('Ingresa un cupo disponible válido', 'error'); return; }
+    if (availableInput > creditLimit) { Utils.showToast('El disponible no puede ser mayor al cupo total', 'error'); return; }
+
+    const usedAmount = creditLimit - availableInput;
 
     try {
       if (this.editingUserCard) {
-        await this.db.updateUserCard({ ...this.editingUserCard, name, bank, creditLimit });
+        await this.db.updateUserCard({ ...this.editingUserCard, name, bank, creditLimit, usedAmount });
         Utils.showToast('Tarjeta actualizada ✓');
       } else {
-        await this.db.addUserCard({ name, bank, creditLimit, usedAmount: 0 });
+        await this.db.addUserCard({ name, bank, creditLimit, usedAmount });
         Utils.showToast('Tarjeta agregada ✓');
       }
       this.closeCardModal();
