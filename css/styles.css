@@ -1193,6 +1193,15 @@ button {
   background: linear-gradient(145deg, rgba(0, 229, 160, 0.06), rgba(124, 58, 237, 0.04));
   border-color: rgba(0, 229, 160, 0.12);
 }
+
+.balance-card .card-amount {
+  color: #ffffff;
+}
+
+[data-theme="light"] .balance-card .card-amount {
+  color: #2563eb;
+}
+
 .balance-details {
   display: flex;
   align-items: center;
