@@ -1598,6 +1598,37 @@ input:checked + .toggle-slider::before {
   width: 100%;
 }
 
+/* ---- Privacy Settings ---- */
+.privacy-setting {
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+.privacy-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+.privacy-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.privacy-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Hide values when hidden */
+#app.hide-values .card-amount,
+#app.hide-values .balance-detail-amount {
+  filter: blur(6px);
+  user-select: none;
+  pointer-events: none;
+  color: var(--text-primary);
+}
+
 /* ---- History Tabs ---- */
 .history-tabs {
   display: flex;

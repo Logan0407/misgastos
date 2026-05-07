@@ -1585,6 +1585,25 @@ class MisGastosApp {
       });
     });
 
+    // Hide values toggle
+    const hideValuesToggle = document.getElementById('hide-values-toggle');
+    const hideValues = await this.db.getSetting('hideValues') || false;
+    hideValuesToggle.checked = hideValues;
+    if (hideValues) document.getElementById('app').classList.add('hide-values');
+
+    hideValuesToggle.addEventListener('change', async () => {
+      const app = document.getElementById('app');
+      if (hideValuesToggle.checked) {
+        app.classList.add('hide-values');
+        await this.db.setSetting('hideValues', true);
+        Utils.showToast('Valores ocultos ✓');
+      } else {
+        app.classList.remove('hide-values');
+        await this.db.setSetting('hideValues', false);
+        Utils.showToast('Valores visibles');
+      }
+    });
+
     // Notification toggle
     const notifToggle = document.getElementById('notif-toggle');
     const notifDaysRow = document.getElementById('notif-days-row');
@@ -1683,6 +1702,12 @@ class MisGastosApp {
       b.classList.toggle('active', b.dataset.currency === currency);
     });
     this.applyCurrency(currency);
+
+    // Load hide values
+    const hideValues = await this.db.getSetting('hideValues');
+    if (hideValues) {
+      document.getElementById('app').classList.add('hide-values');
+    }
 
     // Load notifications
     const notifEnabled = await this.db.getSetting('notifications');
