@@ -167,6 +167,7 @@ class MisGastosApp {
 
     // Payments summary
     await this.renderPaymentsSummary(monthKey);
+    this.checkPaymentNotifications();
 
     // Charts
     this.charts.renderCategoryChart('category-chart', stats.byCategory);
@@ -1572,53 +1573,138 @@ class MisGastosApp {
       });
     });
 
-    // Budget
-    const budgetInput = document.getElementById('budget-amount');
-    const saveBudgetBtn = document.getElementById('save-budget');
-
-    budgetInput.addEventListener('input', () => {
-      budgetInput.value = Utils.formatAmountInput(budgetInput.value);
+    // Currency selector
+    document.querySelectorAll('#currency-selector .currency-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        document.querySelectorAll('#currency-selector .currency-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const currency = btn.dataset.currency;
+        await this.db.setSetting('currency', currency);
+        this.applyCurrency(currency);
+        Utils.showToast(`Moneda: ${currency} ✓`);
+      });
     });
 
-    saveBudgetBtn.addEventListener('click', async () => {
-      const amount = Utils.parseCurrency(budgetInput.value);
-      if (amount > 0) {
-        await this.db.setBudget(Utils.currentMonthKey(), amount);
-        Utils.showToast(`Presupuesto: ${Utils.formatCurrency(amount)} ✓`);
-      } else {
-        Utils.showToast('Ingresa un monto válido', 'error');
-      }
-    });
+    // Notification toggle
+    const notifToggle = document.getElementById('notif-toggle');
+    const notifDaysRow = document.getElementById('notif-days-row');
+    const notifDaysSelect = document.getElementById('notif-days-before');
 
-    // Export
-    document.getElementById('export-csv').addEventListener('click', async () => {
-      try {
-        await this.db.exportToCSV();
-        Utils.showToast('CSV exportado ✓');
-      } catch (err) {
-        Utils.showToast('Error al exportar', 'error');
-      }
-    });
-
-    // Clear data
-    document.getElementById('clear-data').addEventListener('click', () => {
-      this.showConfirm(
-        '¿Borrar todo?',
-        'Se eliminarán todos los gastos y configuraciones. Esta acción no se puede deshacer.',
-        async () => {
-          await this.db.clearAll();
-          Utils.showToast('Datos eliminados');
-          await this.refreshDashboard();
+    notifToggle.addEventListener('change', async () => {
+      if (notifToggle.checked) {
+        // Request notification permission
+        if ('Notification' in window) {
+          const perm = await Notification.requestPermission();
+          if (perm === 'granted') {
+            await this.db.setSetting('notifications', true);
+            notifDaysRow.style.display = '';
+            this.updateNotifStatus('granted');
+            Utils.showToast('Notificaciones activadas ✓');
+            this.checkPaymentNotifications();
+          } else {
+            notifToggle.checked = false;
+            this.updateNotifStatus('denied');
+            Utils.showToast('Permiso de notificaciones denegado', 'error');
+          }
+        } else {
+          notifToggle.checked = false;
+          this.updateNotifStatus('unsupported');
+          Utils.showToast('Tu navegador no soporta notificaciones', 'error');
         }
-      );
+      } else {
+        await this.db.setSetting('notifications', false);
+        notifDaysRow.style.display = 'none';
+        this.updateNotifStatus('off');
+        Utils.showToast('Notificaciones desactivadas');
+      }
+    });
+
+    notifDaysSelect.addEventListener('change', async () => {
+      await this.db.setSetting('notifDaysBefore', parseInt(notifDaysSelect.value));
+    });
+  }
+
+  applyCurrency(currency) {
+    const info = document.getElementById('currency-info');
+    if (currency === 'USD') {
+      info.textContent = 'Formato: US$1,000.00';
+    } else {
+      info.textContent = 'Formato: $1.000.000';
+    }
+    // Save to Utils for formatting
+    Utils.currentCurrency = currency;
+  }
+
+  updateNotifStatus(status) {
+    const el = document.getElementById('notif-status');
+    switch (status) {
+      case 'granted':
+        el.innerHTML = '<span style="color:#22c55e">✓ Notificaciones activas</span>';
+        break;
+      case 'denied':
+        el.innerHTML = '<span style="color:#ef4444">✗ Permiso denegado — habilítalo en la configuración del navegador</span>';
+        break;
+      case 'unsupported':
+        el.innerHTML = '<span style="color:#f59e0b">⚠ Tu navegador no soporta notificaciones</span>';
+        break;
+      case 'off':
+        el.innerHTML = '';
+        break;
+    }
+  }
+
+  async checkPaymentNotifications() {
+    const notifEnabled = await this.db.getSetting('notifications');
+    if (!notifEnabled || !('Notification' in window) || Notification.permission !== 'granted') return;
+
+    const daysBefore = (await this.db.getSetting('notifDaysBefore')) ?? 1;
+    const payments = await this.db.getAllRecurringPayments();
+    const monthKey = Utils.currentMonthKey();
+    const statuses = await this.db.getMonthPaymentStatuses(monthKey);
+    const today = new Date().getDate();
+
+    payments.forEach(p => {
+      if (statuses[p.id]) return; // already paid
+      const targetDay = p.dueDay - daysBefore;
+      if (today === targetDay || today === p.dueDay) {
+        const daysLeft = p.dueDay - today;
+        const msg = daysLeft === 0
+          ? `¡${p.name} vence HOY! — ${Utils.formatCurrency(p.amount)}`
+          : `${p.name} vence en ${daysLeft} día${daysLeft > 1 ? 's' : ''} — ${Utils.formatCurrency(p.amount)}`;
+        new Notification('💳 MisGastos', { body: msg, icon: './icons/icon-192.png' });
+      }
     });
   }
 
   async loadSettings() {
-    const budget = await this.db.getBudget(Utils.currentMonthKey());
-    const budgetInput = document.getElementById('budget-amount');
-    if (budget) {
-      budgetInput.value = Utils.formatAmountInput(budget.amount.toString());
+    // Load currency
+    const currency = await this.db.getSetting('currency') || 'CLP';
+    document.querySelectorAll('#currency-selector .currency-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.currency === currency);
+    });
+    this.applyCurrency(currency);
+
+    // Load notifications
+    const notifEnabled = await this.db.getSetting('notifications');
+    const notifToggle = document.getElementById('notif-toggle');
+    const notifDaysRow = document.getElementById('notif-days-row');
+    notifToggle.checked = !!notifEnabled;
+    notifDaysRow.style.display = notifEnabled ? '' : 'none';
+
+    if (notifEnabled) {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        this.updateNotifStatus('granted');
+      } else {
+        this.updateNotifStatus('denied');
+        notifToggle.checked = false;
+        await this.db.setSetting('notifications', false);
+        notifDaysRow.style.display = 'none';
+      }
+    }
+
+    const daysBefore = await this.db.getSetting('notifDaysBefore');
+    if (daysBefore !== null && daysBefore !== undefined) {
+      document.getElementById('notif-days-before').value = daysBefore;
     }
   }
 

@@ -1467,6 +1467,126 @@ button {
   font-size: 1.6rem;
 }
 
+/* ---- Currency Selector ---- */
+.currency-selector {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.currency-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-out);
+}
+.currency-btn:active { transform: scale(0.97); }
+.currency-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.currency-btn-icon { font-size: 1.3rem; }
+.currency-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+/* ---- Notification Settings ---- */
+.notification-setting {
+  flex-direction: column !important;
+  gap: 12px !important;
+}
+.notif-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 12px;
+}
+.notif-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.notif-desc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: 26px;
+  transition: 0.3s;
+}
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background: var(--text-muted);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+input:checked + .toggle-slider {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+input:checked + .toggle-slider::before {
+  transform: translateX(22px);
+  background: #fff;
+}
+
+/* Notification days row */
+.notif-days-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.notif-days-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.notif-days-row select {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+}
+.notif-status {
+  font-size: 0.75rem;
+  width: 100%;
+}
+
 /* ---- History Tabs ---- */
 .history-tabs {
   display: flex;

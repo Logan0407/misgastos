@@ -275,25 +275,50 @@
       </div>
 
       <div class="settings-group">
-        <h3>💰 Presupuesto Mensual</h3>
+        <h3>💱 Moneda</h3>
         <div class="setting-item">
-          <input type="text" id="budget-amount" inputmode="numeric" placeholder="Ej: 500.000">
-          <button id="save-budget" class="btn-secondary">Guardar</button>
+          <div class="currency-selector" id="currency-selector">
+            <button class="currency-btn active" data-currency="CLP" type="button">
+              <span class="currency-btn-icon">🇨🇱</span>
+              <span>CLP</span>
+            </button>
+            <button class="currency-btn" data-currency="USD" type="button">
+              <span class="currency-btn-icon">🇺🇸</span>
+              <span>USD</span>
+            </button>
+          </div>
+          <div class="currency-info" id="currency-info">Formato: $1.000.000</div>
         </div>
       </div>
 
       <div class="settings-group">
-        <h3>📤 Exportar Datos</h3>
-        <button id="export-csv" class="btn-secondary">Exportar a CSV</button>
-      </div>
-
-      <div class="settings-group">
-        <h3>⚠️ Zona de Peligro</h3>
-        <button id="clear-data" class="btn-danger">🗑️ Borrar todos los datos</button>
+        <h3>🔔 Notificaciones de Pagos</h3>
+        <div class="setting-item notification-setting">
+          <div class="notif-toggle-row">
+            <div>
+              <div class="notif-title">Alertas de vencimiento</div>
+              <div class="notif-desc">Notificar antes del vencimiento de pagos recurrentes</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="notif-toggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          <div class="notif-days-row" id="notif-days-row" style="display:none;">
+            <span class="notif-days-label">Notificar</span>
+            <select id="notif-days-before">
+              <option value="0">El mismo día</option>
+              <option value="1" selected>1 día antes</option>
+              <option value="2">2 días antes</option>
+              <option value="3">3 días antes</option>
+            </select>
+          </div>
+          <div class="notif-status" id="notif-status"></div>
+        </div>
       </div>
 
       <div class="settings-version">
-        MisGastos v2.0 — Hecho con 💚
+        MisGastos v3.0 — Hecho con 💚
       </div>
     </section>
 
