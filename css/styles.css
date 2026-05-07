@@ -66,6 +66,7 @@
 
 [data-theme="light"] .btn-primary {
   color: #ffffff;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
 }
 
 [data-theme="light"] #expense-date,
@@ -635,15 +636,15 @@ button {
 .btn-primary {
   padding: 16px;
   border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  color: #0a0a14;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6);
+  color: #ffffff;
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.3px;
   border: none;
   cursor: pointer;
   transition: all 0.2s var(--ease-out);
-  box-shadow: var(--shadow-accent);
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
   position: relative;
   overflow: hidden;
 }
@@ -1261,7 +1262,8 @@ button {
 }
 .income-symbol { color: #00e5a0; }
 .btn-income {
-  background: linear-gradient(135deg, #00e5a0, #00b37d) !important;
+  background: linear-gradient(135deg, #7c3aed, #3b82f6) !important;
+  color: #ffffff !important;
 }
 
 /* ---- Payments View ---- */
