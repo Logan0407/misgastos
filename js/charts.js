@@ -122,6 +122,11 @@ class GastosCharts {
 
   // ---- Gráfico de Barras (últimos 7 días) ----
 
+  _generateRandomColor() {
+    const hue = Math.floor(Math.random() * 360);
+    return `hsl(${hue}, 70%, 55%)`;
+  }
+
   renderDailyChart(canvasId, byDay) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
@@ -134,13 +139,10 @@ class GastosCharts {
     const labels = last7.map(d => Utils.shortDayName(d));
     const data = last7.map(d => byDay[d] || 0);
 
-    const maxVal = Math.max(...data, 1);
     const ctx = canvas.getContext('2d');
 
-    // Gradient
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, 'rgba(0, 229, 160, 0.8)');
-    gradient.addColorStop(1, 'rgba(0, 229, 160, 0.1)');
+    // Generar colores aleatorios para cada día
+    const colors = data.map(() => this._generateRandomColor());
 
     this.dailyChart = new Chart(ctx, {
       type: 'bar',
@@ -148,9 +150,7 @@ class GastosCharts {
         labels,
         datasets: [{
           data,
-          backgroundColor: data.map((val) =>
-            val === maxVal ? 'rgba(0, 229, 160, 0.9)' : 'rgba(0, 229, 160, 0.35)'
-          ),
+          backgroundColor: colors,
           borderRadius: 8,
           borderSkipped: false,
           maxBarThickness: 40
